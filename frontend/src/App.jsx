@@ -38,6 +38,8 @@ function App() {
     totalBankMemories: 0,
   });
   const [systemHealth, setSystemHealth] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("");
 
   const messagesEndRef = useRef(null);
 
@@ -52,6 +54,7 @@ function App() {
   }, []);
 
   const fetchHealthAndMemories = async () => {
+    setIsRefreshing(true);
     try {
       const [healthRes, memRes] = await Promise.all([
         fetch("http://localhost:5000/api/health").catch(() => null),
@@ -71,8 +74,14 @@ function App() {
           totalBankMemories: memData.items?.length || 0,
         }));
       }
+      setSyncStatus("✓ Synced!");
+      setTimeout(() => setSyncStatus(""), 2000);
     } catch (e) {
       console.error("Failed to load initial telemetry", e);
+      setSyncStatus("⚠️ Error");
+      setTimeout(() => setSyncStatus(""), 2500);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -295,19 +304,18 @@ function App() {
               <span>🧠 Hindsight Inspector</span>
               <span className="bank-tag">{telemetry.bankId}</span>
             </div>
-            <button
-              onClick={fetchHealthAndMemories}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                fontSize: "13px"
-              }}
-              title="Refresh Memory Bank"
-            >
-              🔄
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {syncStatus && <span className="sync-status">{syncStatus}</span>}
+              <button
+                className="refresh-btn"
+                onClick={fetchHealthAndMemories}
+                disabled={isRefreshing}
+                title="Sync and Refresh Hindsight Cloud Memory Bank"
+              >
+                <span className={`spin-icon ${isRefreshing ? "spinning" : ""}`}>🔄</span>
+                <span>{isRefreshing ? "Syncing..." : "Sync Bank"}</span>
+              </button>
+            </div>
           </div>
 
           <div className="inspector-body">
