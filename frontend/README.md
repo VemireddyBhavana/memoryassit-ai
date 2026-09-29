@@ -1,22 +1,29 @@
-# MemoryAssist AI - Frontend Web App 🖥️
+# MemoryAssist AI — Frontend
 
-Modern, high-performance conversational AI interface with live vector memory inspection, built with **React 19** and **Vite**.
+React 19 + Vite frontend for the MemoryAssist AI enterprise support cockpit.
 
-## Features
+## Stack
 
-- **Live Hindsight Memory Inspector:** Side-by-side panel visualizing recalled memories, semantic similarity scores, entity tags, and total bank memories in real time.
-- **Interactive 60-Second Demo Story:** One-click scenario runner demonstrating multi-turn incident resolution and persistent cross-session memory recall.
-- **Enterprise Dark Design System:** Tailored dark glassmorphic interface utilizing Plus Jakarta Sans and JetBrains Mono typography.
-- **Instant Bank Synchronization:** Dedicated interactive sync button with spin animation and visual feedback connected directly to Hindsight Cloud.
+- **React 19** — UI framework
+- **Vite 8** — build tool and dev server
+- **Vanilla CSS** — full custom glassmorphic dark design system
 
-## Running Locally
+## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
+# ➜ Local: http://localhost:5173/
 ```
 
-Visit `http://localhost:5173/` in your browser.
+The frontend expects the backend running on `http://localhost:5000`.  
+See the [root README](../README.md) for full setup instructions.
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/App.jsx` | Main app — chat panel, memory inspector, scenario buttons |
+| `src/index.css` | Full design system — CSS variables, glassmorphism, animations |
+| `index.html` | HTML entry point |
+| `vite.config.js` | Vite configuration |

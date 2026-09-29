@@ -1,160 +1,316 @@
 # MemoryAssist AI 🧠
 ### Autonomous Enterprise Customer Support & Incident Memory Cockpit
-> Built for the **AI Agents That Learn Hackathon** powered by **Hindsight (Vectorize)** and **Groq**.
 
 [![Hindsight](https://img.shields.io/badge/Memory_Engine-Hindsight_Cloud_v0.10.1-6366F1?style=flat-square)](https://hindsight.vectorize.io)
 [![Groq](https://img.shields.io/badge/LLM_Inference-Groq_GPT--OSS--120B-06B6D4?style=flat-square)](https://groq.com)
 [![Frontend](https://img.shields.io/badge/Frontend-React_19_+_Vite-10B981?style=flat-square)](https://react.dev)
 [![Backend](https://img.shields.io/badge/Backend-Express_+_Node.js-F59E0B?style=flat-square)](https://nodejs.org)
+[![License](https://img.shields.io/badge/License-MIT-white?style=flat-square)](LICENSE)
 
 ---
 
-## 🌟 Executive Summary & Problem Statement
+## 📌 The Problem
 
-### The Real-World Pain Point:
-In enterprise technical support and DevOps incident management, **customers hate repeating themselves**. When a production Kubernetes cluster crashes on AWS, customer engineers spend 15–30 minutes re-explaining:
+Enterprise technical support and DevOps incident management is broken in one specific way: **customers are forced to repeat themselves every single time.**
+
+When a production Kubernetes cluster crashes at 2 AM — for the third time this month — the support engineer has to spend 15–30 minutes re-explaining:
+
 - Which cluster ID failed (`eks-prod-us-east-1`)
-- Their architecture (Redis cache pod, node group instance types)
+- Their cloud architecture (Redis cache pod, node group instance type)
 - What temporary mitigations were applied last week
-- Past post-mortem action items
+- What the post-mortem action items were
 
-Stateless chatbots treat every interaction as day zero. Standard RAG only searches static documentation.
+**Stateless AI chatbots make this worse, not better.** They give the same generic checklist every session because they have zero memory of anything that came before. Standard RAG (Retrieval Augmented Generation) can search static documentation, but it cannot learn from past customer conversations.
 
-### The Solution:
-**MemoryAssist AI** integrates **Hindsight**, an active agent memory system that **retains**, **recalls**, and **learns** across conversations.
-- **Before Hindsight:** The assistant gives generic advice and asks the user to repeat their infrastructure specifications.
-- **With Hindsight:** The assistant instantly recalls past outages, recognizes the exact cluster and previous fix, and delivers a personalized runbook in seconds.
+Every session is day zero. Every incident starts from scratch.
 
 ---
 
-## 🎯 Hackathon Judging Criteria Alignment
+## 💡 The Solution
 
-| Criteria | Weight | How MemoryAssist AI Delivers |
-| :--- | :---: | :--- |
-| **Innovation** | **30%** | Moves beyond conversational chatbots to an **Enterprise Memory Cockpit** with multi-session customer memory, real-time memory telemetry, and automated runbook generation. |
-| **Use of Hindsight Memory** | **25%** | **Memory is the central star.** Implements the complete Hindsight trifecta: **`retain()`**, **`recall()`**, and **`reflect()`**. Includes live memory inspection, keyword bank search, and agentic post-mortem synthesis via `hindsight.reflect()`. |
-| **Technical Implementation** | **20%** | Clean separation of concerns (React 19 + Express), robust error handling, async memory retention, non-blocking telemetry, and real-time bank health checks. |
-| **User Experience (UX)** | **15%** | Ultra-sleek dark glassmorphic SaaS interface, dual-panel real-time memory inspector, 1-click 60-second interactive demo scenario buttons, and live latency counters. |
-| **Real-world Impact** | **10%** | Targets a high-value B2B workflow ($50+/seat enterprise support), cutting incident resolution time (MTTR) by up to 60%. |
+**MemoryAssist AI** is an autonomous enterprise support agent that uses **[Hindsight](https://hindsight.vectorize.io/)** — a persistent agent memory system — to remember, recall, and learn across every customer interaction.
+
+Instead of asking "Can you describe your infrastructure again?", the agent:
+
+1. **Retains** every incident, fix, and infrastructure detail into a persistent cloud memory bank
+2. **Recalls** the exact relevant history before every response — no repetition required
+3. **Reflects** across all stored memories to synthesize executive post-mortems and proactive architectural recommendations
+
+### Before Hindsight:
+> Customer: *"Our cluster crashed again."*
+> Agent: *"Can you describe your cluster setup and what error you're seeing?"*
+
+### With Hindsight:
+> Customer: *"Our cluster crashed again."*
+> Agent: *"I can see `eks-prod-us-east-1` had a Redis OOMKilled issue 4 days ago. You restarted the worker node as a temporary fix. The permanent solution is setting Redis `maxmemory` to 800mb with an `allkeys-lru` eviction policy — here's the exact config..."*
+
+**That delta is the entire value proposition.**
 
 ---
 
 ## 🏗️ System Architecture
 
-```mermaid
-flowchart TD
-    User["Customer / DevOps Engineer"] -->|Interacts via Chat| Frontend["React 19 Enterprise UI"]
-    Frontend -->|POST /chat| Backend["Express.js Server"]
-    
-    subgraph MemoryLayer ["Hindsight Memory Layer"]
-        Backend -->|"1. recall Query"| HClient["Hindsight Client SDK (@vectorize-io)"]
-        HClient -->|"Retrieve Prior Facts & Entities"| HCloud[("Hindsight Cloud Bank")]
-        HCloud -->|"Return Relevant Memories + Scores"| HClient
-    end
-
-    subgraph FastInference ["Fast Inference"]
-        HClient -->|"2. Inject Facts into System Prompt"| LLM["Groq GPT-OSS-120B"]
-        LLM -->|"3. Synthesize Contextual Answer"| Backend
-    end
-
-    subgraph ActiveLearning ["Active Learning"]
-        Backend -.->|"4. Async retain Interaction"| HClient
-        HClient -.->|"Index World Facts & Observations"| HCloud
-    end
-
-    Backend -->|"Return Reply + Recalled Memories + Latency"| Frontend
-    Frontend -->|"Update Chat & Live Inspector"| User
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    USER (Browser)                            │
+│              React 19 + Vite Frontend                        │
+└─────────────────────────┬────────────────────────────────────┘
+                          │  POST /chat
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│                 Express.js Backend (Node.js)                 │
+│                                                              │
+│  1. hindsight.recall(bankId, scopedQuery)  ← BEFORE LLM     │
+│     └─ Returns relevant past memories + scores               │
+│                                                              │
+│  2. Inject memories → Groq system prompt                     │
+│     └─ Groq GPT-OSS-120B generates contextual response       │
+│                                                              │
+│  3. hindsight.retain(bankId, interaction)  ← AFTER LLM      │
+│     └─ Async, non-blocking. Never delays the response.       │
+│                                                              │
+│  4. hindsight.reflect(bankId, query)       ← ON DEMAND      │
+│     └─ Agentic synthesis across ALL memories (post-mortem)   │
+└──────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│              Hindsight Cloud Memory Bank                     │
+│              Bank ID: MemoryAssist-AI                        │
+│  • Semantic vector search                                    │
+│  • Entity extraction & tagging                               │
+│  • Confidence scoring (semantic + reranker)                  │
+│  • Persistent cross-session storage                          │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## ⚡ 60-Second Demo Story Walkthrough (For Judges)
+## ✨ Key Features
 
-1. **Step 1: Report Production Incident (Interaction 1)**
-   - **User Input:** *"Hi, our production cluster `eks-prod-us-east-1` crashed today with OOMKilled errors on the Redis cache pod. We had to restart the worker node."*
-   - **Hindsight Action:** Asynchronously extracts and indexes the cluster ID, Redis pod details, and node restart action into the `MemoryAssist-AI` bank.
-   - **AI Reply:** Provides immediate troubleshooting steps and logs the incident.
-
-2. **Step 2: The Magic Recall (Interaction 2 - Days Later)**
-   - **User Input:** *"Our cluster crashed again today with the same error. What was our configuration and what did we do last time?"*
-   - **Hindsight Action:** Automatically executes `hindsight.recall()`, retrieving the exact past facts, cluster name, and previous remediation.
-   - **AI Reply:** Instantly recognizes the customer, recalls the cluster ID (`eks-prod-us-east-1`), highlights that the previous fix was a worker node restart and pod limit bump, and provides proactive preventative configuration (setting Redis `maxmemory`).
-   - **Inspector Panel:** Displays the live matched facts, confidence scores (e.g. 94%), and entity tags in real time!
+| Feature | Description |
+|---------|-------------|
+| **`retain()`** | Stores every customer interaction to Hindsight Cloud asynchronously (zero latency impact) |
+| **`recall()`** | Retrieves semantically relevant past memories before every LLM call, scoped by customer ID |
+| **`reflect()`** | Runs agentic synthesis across ALL memories to generate executive post-mortems |
+| **Multi-Tenant Memory** | 3 enterprise customer profiles, each with isolated memory context |
+| **Live Memory Inspector** | Real-time panel showing recalled facts, confidence scores (%), and entity tags |
+| **Latency Sparkline** | Visual history of recall latency per message |
+| **P1 Incident Timer** | Live elapsed time tracker for critical incidents |
+| **4-Tier Fallback** | Never shows a 500 error — gracefully degrades through cloud → local cache → LLM-free → static |
+| **Voice Reader** | Browser TTS reads AI runbooks aloud |
+| **Export to Markdown** | Post-mortems and chat transcripts downloadable as `.md` |
+| **Toast Notifications** | Real-time alerts for every retain/recall event |
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js (v18+)
-- Groq API Key
-- Hindsight Cloud API Key & Bank ID
+- **Node.js** v18 or higher
+- **Groq API Key** — [get one free at groq.com](https://groq.com)
+- **Hindsight Cloud API Key & Bank ID** — [get one at ui.hindsight.vectorize.io](https://ui.hindsight.vectorize.io)
 
-### 1. Backend Setup
+---
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/VemireddyBhavana/memoryassit-ai.git
+cd memoryassit-ai
+```
+
+---
+
+### 2. Backend Setup
+
 ```bash
 cd backend
 npm install
 ```
 
-Configure your `backend/.env` file:
+Create your `.env` file (copy from the example):
+
+```bash
+cp .env.example .env
+```
+
+Edit `backend/.env`:
+
 ```env
-GROQ_API_KEY=your_groq_api_key
-HINDSIGHT_API_KEY=your_hindsight_api_key
+GROQ_API_KEY=your_groq_api_key_here
+HINDSIGHT_API_KEY=your_hindsight_api_key_here
 HINDSIGHT_BASE_URL=https://api.hindsight.vectorize.io
 HINDSIGHT_BANK_ID=MemoryAssist-AI
 PORT=5000
 ```
 
-Start the backend:
+Start the backend server:
+
 ```bash
 npm start
 # 🚀 MemoryAssist AI Server running on port 5000
 ```
 
-### 2. Frontend Setup
+---
+
+### 3. Frontend Setup
+
 ```bash
-cd frontend
+cd ../frontend
 npm install
 npm run dev
-# ➜ Local: http://localhost:5173/
+# ➜  Local: http://localhost:5173/
 ```
 
-Open [http://localhost:5173/](http://localhost:5173/) in your browser.
+Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ---
 
 ## 🛠️ API Reference
 
 ### `POST /chat`
-Processes conversational queries with active Hindsight memory recall and background retention.
-- **Request Body:** `{ "message": "...", "customerId": "cust-nexus-01" }`
-- **Response:**
-  ```json
-  {
-    "reply": "Hi Bhavana, I see you are hitting the same Redis OOM issue on eks-prod-us-east-1...",
-    "recalledMemories": [
-      {
-        "text": "Production cluster eks-prod-us-east-1 experienced an outage due to OOMKilled errors...",
-        "scores": { "semantic": 0.74, "reranker": 0.034 }
-      }
-    ],
-    "memoryCount": 1,
-    "telemetry": {
-      "recallLatencyMs": 142,
-      "totalLatencyMs": 580,
-      "bankId": "MemoryAssist-AI",
-      "retained": true
+The primary chat endpoint. Executes the full recall → inject → generate → retain pipeline.
+
+**Request Body:**
+```json
+{
+  "message": "Our cluster crashed again with the same OOM error.",
+  "customerId": "cust-nexus-01"
+}
+```
+
+**Response:**
+```json
+{
+  "reply": "Based on your prior incident, eks-prod-us-east-1 had Redis OOMKilled on 2026-09-25. The worker node was restarted. Permanent fix: set maxmemory 800mb + allkeys-lru policy...",
+  "recalledMemories": [
+    {
+      "text": "Production cluster eks-prod-us-east-1 crashed with OOMKilled on Redis cache pod...",
+      "scores": { "semantic": 0.74, "reranker": 0.034, "final": 0.00041 },
+      "entities": ["eks-prod-us-east-1", "Redis", "OOMKilled"]
     }
+  ],
+  "memoryCount": 112,
+  "telemetry": {
+    "recallLatencyMs": 897,
+    "totalLatencyMs": 4167,
+    "bankId": "MemoryAssist-AI",
+    "retained": true,
+    "memorySource": "hindsight_cloud",
+    "llmSource": "groq_cloud"
   }
-  ```
+}
+```
+
+---
 
 ### `GET /api/health`
-Returns connectivity status and feature flags for Hindsight Cloud and Groq LLM.
+Returns connectivity status for Hindsight Cloud and Groq.
+
+**Response (healthy):**
+```json
+{
+  "status": "healthy",
+  "hindsight": { "connected": true, "version": "0.10.1", "bankId": "MemoryAssist-AI" },
+  "groq": { "connected": true, "model": "openai/gpt-oss-120b" }
+}
+```
+
+---
 
 ### `GET /api/memories`
-Lists all persistent memories stored in the current Hindsight memory bank.
+Lists all memories stored in the Hindsight bank. Falls back to local cache if cloud is unreachable.
+
+---
+
+### `POST /api/reflect`
+Triggers `hindsight.reflect()` for agentic post-mortem synthesis across all stored memories.
+
+**Request Body:**
+```json
+{ "query": "What is the recurring issue and what architectural changes do you recommend?" }
+```
+
+---
+
+### `POST /api/reset`
+Clears the local session cache. Useful for demo resets.
+
+---
+
+## 🎬 60-Second Demo Story
+
+The UI has pre-built demo scenarios for each customer. Here's how to demonstrate the memory magic:
+
+**Step 1 — Report an Incident (Interaction 1)**
+> Click: *"1. Report EKS Incident"* in the left sidebar
+> 
+> This sends: *"Our production cluster `eks-prod-us-east-1` crashed with OOMKilled errors on the Redis cache pod."*
+> 
+> → Hindsight `retain()` indexes: cluster ID, error type, mitigation taken, infrastructure context.
+
+**Step 2 — Watch the Magic Recall (Days Later)**
+> Click: *"2. The 'Magic' Recall"*
+>
+> This sends only: *"Our cluster crashed again. What did we do last time?"*
+>
+> → Without any cluster ID or context, Hindsight `recall()` retrieves the exact prior incident.
+> → The AI responds with the specific cluster name, previous fix, and permanent resolution.
+> → The Memory Inspector shows confidence scores live (74–94%).
+
+**Step 3 — Executive Post-Mortem**
+> Click: *"🔮 4. Executive Post-Mortem"*
+>
+> → `hindsight.reflect()` synthesizes all stored memories into a root-cause analysis with architectural recommendations — no manual prompt engineering required.
+
+---
+
+## 💻 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 19, Vite 8, Vanilla CSS |
+| Backend | Node.js, Express 5 |
+| Memory Layer | [Hindsight Cloud](https://hindsight.vectorize.io/) (`@vectorize-io/hindsight-client` v0.10.1) |
+| LLM Inference | [Groq](https://groq.com) — `openai/gpt-oss-120b` |
+| Deployment | Local dev (backend: port 5000, frontend: port 5173) |
+
+---
+
+## 📂 Project Structure
+
+```
+memoryassist-ai/
+├── backend/
+│   ├── server.js          # Express server — all API routes + Hindsight integration
+│   ├── package.json
+│   ├── .env.example       # Template for required environment variables
+│   └── README.md
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx        # Main React app — chat UI + Memory Inspector
+│   │   └── index.css      # Full design system (glassmorphic dark theme)
+│   ├── index.html
+│   ├── vite.config.js
+│   └── package.json
+├── article.md             # Technical blog article about this project
+├── social_and_video.md    # LinkedIn post + video script
+└── README.md              # This file
+```
+
+---
+
+## 🔗 Resources
+
+- [Hindsight Documentation](https://hindsight.vectorize.io/)
+- [Hindsight GitHub Repository](https://github.com/vectorize-io/hindsight)
+- [What is Agent Memory? — Vectorize](https://vectorize.io/what-is-agent-memory)
+- [Groq Console](https://console.groq.com)
+- [Hindsight Cloud Dashboard](https://ui.hindsight.vectorize.io)
 
 ---
 
 ## 📜 License
-MIT License. Created for the Vectorize Hindsight Hackathon.
+
+MIT License — see [LICENSE](LICENSE) for details.
