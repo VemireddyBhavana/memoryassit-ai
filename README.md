@@ -42,28 +42,28 @@ Stateless chatbots treat every interaction as day zero. Standard RAG only search
 ## 🏗️ System Architecture
 
 ```mermaid
-graph TD
-    User([Customer / DevOps Engineer]) -->|Interacts via Chat| Frontend[React 19 Enterprise UI]
-    Frontend -->|POST /chat| Backend[Express.js Server]
+flowchart TD
+    User["Customer / DevOps Engineer"] -->|Interacts via Chat| Frontend["React 19 Enterprise UI"]
+    Frontend -->|POST /chat| Backend["Express.js Server"]
     
-    subgraph Hindsight Memory Layer
-        Backend -->|1. recall Query| HClient[@vectorize-io/hindsight-client]
-        HClient -->|Retrieve Prior Facts & Entities| HCloud[(Hindsight Cloud Bank)]
-        HCloud -->|Return Relevant Memories + Scores| HClient
+    subgraph MemoryLayer ["Hindsight Memory Layer"]
+        Backend -->|"1. recall Query"| HClient["Hindsight Client SDK (@vectorize-io)"]
+        HClient -->|"Retrieve Prior Facts & Entities"| HCloud[("Hindsight Cloud Bank")]
+        HCloud -->|"Return Relevant Memories + Scores"| HClient
     end
 
-    subgraph Fast Inference
-        HClient -->|2. Inject Facts into System Prompt| LLM[Groq GPT-OSS-120B]
-        LLM -->|3. Synthesize Contextual Answer| Backend
+    subgraph FastInference ["Fast Inference"]
+        HClient -->|"2. Inject Facts into System Prompt"| LLM["Groq GPT-OSS-120B"]
+        LLM -->|"3. Synthesize Contextual Answer"| Backend
     end
 
-    subgraph Active Learning
-        Backend -.->|4. Async retain Interaction| HClient
-        HClient -.->|Index World Facts & Observations| HCloud
+    subgraph ActiveLearning ["Active Learning"]
+        Backend -.->|"4. Async retain Interaction"| HClient
+        HClient -.->|"Index World Facts & Observations"| HCloud
     end
 
-    Backend -->|Return Reply + Recalled Memories + Latency| Frontend
-    Frontend -->|Update Chat & Live Inspector| User
+    Backend -->|"Return Reply + Recalled Memories + Latency"| Frontend
+    Frontend -->|"Update Chat & Live Inspector"| User
 ```
 
 ---
