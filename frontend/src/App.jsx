@@ -1,34 +1,77 @@
 import { useState, useEffect, useRef } from "react";
 
-const DEMO_SCENARIOS = [
+const CUSTOMERS = [
   {
-    title: "1. Report Production Incident",
-    desc: "Customer reports Kubernetes OOM crash on AWS cluster eks-prod-us-east-1 with Redis caching.",
-    prompt: "Hi, our production cluster eks-prod-us-east-1 crashed today with OOMKilled errors on the Redis cache pod. We had to restart the worker node.",
+    id: "cust-nexus-01",
+    name: "Nexus Cloud Corp",
+    tier: "Enterprise VIP • Tier 1",
+    cluster: "eks-prod-us-east-1",
+    region: "AWS us-east-1",
+    sla: "99.99% (Urgent)",
+    avatar: "NC",
+    color: "#3b82f6",
+    scenarios: [
+      {
+        title: "1. Report EKS Incident",
+        desc: "Customer reports Kubernetes OOM crash on cluster eks-prod-us-east-1 with Redis caching.",
+        prompt: "Hi, our production cluster eks-prod-us-east-1 crashed today with OOMKilled errors on the Redis cache pod. We had to restart the worker node.",
+      },
+      {
+        title: "2. The 'Magic' Recall (3 Days Later)",
+        desc: "Customer returns with a short question: 'It crashed again'. Watch AI recall exact cluster & previous fix!",
+        prompt: "Our cluster crashed again today with the same error. What was our configuration and what did we do last time?",
+      },
+      {
+        title: "3. Verify Infrastructure History",
+        desc: "Test persistent memory extraction and customer knowledge profile.",
+        prompt: "Can you summarize all past issues and infrastructure details on our Nexus Cloud account?",
+      }
+    ]
   },
   {
-    title: "2. The 'Magic' Recall (3 Days Later)",
-    desc: "Customer returns with a short question: 'It crashed again'. Watch AI recall exact cluster and previous fix!",
-    prompt: "Our cluster crashed again today with the same error. What was our configuration and what did we do last time?",
-  },
-  {
-    title: "3. Verify Context & History",
-    desc: "Test persistent memory extraction and customer knowledge profile.",
-    prompt: "Can you summarize all past issues and infrastructure details on my account?",
+    id: "cust-apex-02",
+    name: "Apex Financial Systems",
+    tier: "FinTech Ultra • Tier 0",
+    cluster: "db-apex-primary",
+    region: "AWS eu-west-1",
+    sla: "99.999% (Mission-Critical)",
+    avatar: "AF",
+    color: "#10b981",
+    scenarios: [
+      {
+        title: "1. Stripe Webhook Timeout",
+        desc: "Report checkout gateway 504 timeouts and PostgreSQL connection pool exhaustion.",
+        prompt: "Critical: Our payment service db-apex-primary in eu-west-1 is timing out on Stripe webhooks. PostgreSQL pool hit max connections (500).",
+      },
+      {
+        title: "2. The 'Magic' Recall (FinTech)",
+        desc: "Customer asks about recurring latency. Watch AI recall Stripe webhook limits and PgBouncer fix!",
+        prompt: "Payment webhook latency spiked again. What connection pool setting and PgBouncer fix did we implement last time?",
+      },
+      {
+        title: "3. Compliance & Audit History",
+        desc: "Query financial compliance records and payment failure logs.",
+        prompt: "Please summarize our recent database incident history for our PCI-DSS audit report.",
+      }
+    ]
   }
 ];
 
 function App() {
+  const [selectedCustomerId, setSelectedCustomerId] = useState("cust-nexus-01");
+  const currentCustomer = CUSTOMERS.find((c) => c.id === selectedCustomerId) || CUSTOMERS[0];
+
   const [messages, setMessages] = useState([
     {
       role: "assistant",
-      content: "Hello! I am MemoryAssist AI. I'm connected directly to your Hindsight Long-Term Memory Bank. How can I help with your enterprise infrastructure or support today?",
+      content: `Hello! I am MemoryAssist AI. I'm connected to your Hindsight Long-Term Memory Bank for ${currentCustomer.name}. How can I assist with your infrastructure or incident today?`,
       memoriesUsed: [],
     }
   ]);
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("live"); // 'live', 'bank', or 'reflect'
+  const [activeTab, setActiveTab] = useState("live"); // 'live', 'bank', 'reflect', 'timeline'
   const [liveMemories, setLiveMemories] = useState([]);
   const [allBankMemories, setAllBankMemories] = useState([]);
   const [bankSearch, setBankSearch] = useState("");
@@ -55,6 +98,20 @@ function App() {
   useEffect(() => {
     fetchHealthAndMemories();
   }, []);
+
+  // When switching customer, update initial greeting
+  const handleCustomerSwitch = (customerId) => {
+    setSelectedCustomerId(customerId);
+    const targetCust = CUSTOMERS.find((c) => c.id === customerId) || CUSTOMERS[0];
+    setMessages([
+      {
+        role: "assistant",
+        content: `Switched customer context to **${targetCust.name}** (${targetCust.tier}). Hindsight memory is now scoped to this organization. How can I help?`,
+        memoriesUsed: [],
+      }
+    ]);
+    setLiveMemories([]);
+  };
 
   const fetchHealthAndMemories = async () => {
     setIsRefreshing(true);
@@ -103,7 +160,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: textToSend,
-          customerId: "cust-nexus-01"
+          customerId: selectedCustomerId
         }),
       });
 
@@ -131,7 +188,6 @@ function App() {
         }));
       }
 
-      // Refresh bank memories in background
       setTimeout(fetchHealthAndMemories, 1200);
 
     } catch (error) {
@@ -158,7 +214,7 @@ function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          query: "What is the recurring issue with this customer infrastructure and what long-term architectural change do you recommend?"
+          query: `Synthesize an executive incident post-mortem and long-term architectural recommendations for ${currentCustomer.name} on cluster ${currentCustomer.cluster}.`
         })
       });
       const data = await res.json();
@@ -177,9 +233,27 @@ function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `incident-postmortem-${Date.now()}.md`;
+    a.download = `incident-postmortem-${currentCustomer.id}-${Date.now()}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // 1-Click Clean Slate / Reset Session
+  const handleResetSession = async () => {
+    try {
+      await fetch("http://localhost:5000/api/reset", { method: "POST" });
+    } catch (e) {
+      console.warn("Reset error:", e);
+    }
+    setMessages([
+      {
+        role: "assistant",
+        content: `Session reset! Clean slate initialized for **${currentCustomer.name}**. Ready for a fresh demo test.`,
+        memoriesUsed: [],
+      }
+    ]);
+    setLiveMemories([]);
+    setReflection(null);
   };
 
   // Filtered bank memories for search
@@ -208,18 +282,50 @@ function App() {
         </div>
 
         <div className="header-badges">
+          {/* Multi-Tenant Switcher */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>TENANT:</span>
+            <select
+              value={selectedCustomerId}
+              onChange={(e) => handleCustomerSwitch(e.target.value)}
+              style={{
+                background: "rgba(30, 41, 59, 0.8)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-primary)",
+                padding: "5px 10px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                outline: "none"
+              }}
+            >
+              {CUSTOMERS.map((c) => (
+                <option key={c.id} value={c.id} style={{ background: "#0f172a" }}>
+                  🏢 {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="status-badge">
             <span className="pulse-dot"></span>
-            <span>Hindsight Cloud: Connected (v{systemHealth?.hindsight?.version || "0.10.1"})</span>
+            <span>Hindsight Cloud (v{systemHealth?.hindsight?.version || "0.10.1"})</span>
           </div>
 
           <div className="tech-badge">
-            ⚡ Groq LLaMA-3 / GPT-OSS
+            ⚡ Groq GPT-OSS
           </div>
 
-          <div className="tech-badge" style={{ fontFamily: "var(--font-mono)" }}>
-            Bank: {telemetry.bankId}
-          </div>
+          {/* 1-Click Clean Slate Button */}
+          <button
+            onClick={handleResetSession}
+            className="refresh-btn"
+            style={{ borderColor: "rgba(244, 63, 94, 0.4)", color: "#fda4af" }}
+            title="Clear current chat and start fresh test"
+          >
+            <span>🧹 Reset Session</span>
+          </button>
         </div>
       </header>
 
@@ -231,23 +337,27 @@ function App() {
             <div className="section-label">Active Customer Context</div>
             <div className="customer-card">
               <div className="customer-header">
-                <div className="customer-avatar">NC</div>
+                <div className="customer-avatar" style={{ background: currentCustomer.color }}>
+                  {currentCustomer.avatar}
+                </div>
                 <div>
-                  <div className="customer-name">Nexus Cloud Corp</div>
-                  <div className="customer-tier">Enterprise VIP • Tier 1</div>
+                  <div className="customer-name">{currentCustomer.name}</div>
+                  <div className="customer-tier" style={{ color: currentCustomer.color }}>
+                    {currentCustomer.tier}
+                  </div>
                 </div>
               </div>
               <div className="meta-row">
                 <span>Cluster ID:</span>
-                <span className="meta-val">eks-prod-us-east-1</span>
+                <span className="meta-val">{currentCustomer.cluster}</span>
               </div>
               <div className="meta-row">
                 <span>Region:</span>
-                <span className="meta-val">AWS us-east-1</span>
+                <span className="meta-val">{currentCustomer.region}</span>
               </div>
               <div className="meta-row">
                 <span>SLA Level:</span>
-                <span className="meta-val" style={{ color: "var(--accent-emerald)" }}>99.99% (Urgent)</span>
+                <span className="meta-val" style={{ color: "var(--accent-emerald)" }}>{currentCustomer.sla}</span>
               </div>
             </div>
           </div>
@@ -255,10 +365,10 @@ function App() {
           <div>
             <div className="section-label">60-Second Demo Story</div>
             <p style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px" }}>
-              Click scenarios to demonstrate persistent Hindsight memory to the judges:
+              Click scenarios to demonstrate persistent Hindsight memory for <strong>{currentCustomer.name}</strong>:
             </p>
 
-            {DEMO_SCENARIOS.map((scenario, index) => (
+            {currentCustomer.scenarios.map((scenario, index) => (
               <button
                 key={index}
                 className="scenario-button"
@@ -276,7 +386,7 @@ function App() {
               </button>
             ))}
 
-            {/* Special Hindsight Reflect Feature (The 3rd Verb!) */}
+            {/* Special Hindsight Reflect Feature */}
             <button
               className="scenario-button"
               style={{
@@ -292,7 +402,7 @@ function App() {
                 <span>{isReflecting ? "⏳" : "→"}</span>
               </div>
               <div className="scenario-desc">
-                Triggers <strong>hindsight.reflect()</strong> to synthesize root-cause & architectural analysis across all memories!
+                Triggers <strong>hindsight.reflect()</strong> to synthesize root-cause & architectural advice across all memories!
               </div>
             </button>
           </div>
@@ -347,7 +457,7 @@ function App() {
               <input
                 type="text"
                 className="chat-input"
-                placeholder="Ask MemoryAssist AI or report an infrastructure issue..."
+                placeholder={`Ask MemoryAssist AI or report an issue for ${currentCustomer.name}...`}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={loading}
@@ -402,15 +512,15 @@ function App() {
               </div>
             </div>
 
-            {/* View Switcher Tabs (Active Recall, Bank Explorer, Executive Reflection) */}
-            <div style={{ display: "flex", gap: "6px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px" }}>
+            {/* View Switcher Tabs (Active Recall, Bank Explorer, Executive Reflection, Timeline) */}
+            <div style={{ display: "flex", gap: "5px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px", flexWrap: "wrap" }}>
               <button
                 onClick={() => setActiveTab("live")}
                 style={{
                   background: activeTab === "live" ? "rgba(99, 102, 241, 0.2)" : "transparent",
                   color: activeTab === "live" ? "var(--text-primary)" : "var(--text-muted)",
                   border: activeTab === "live" ? "1px solid rgba(99, 102, 241, 0.4)" : "1px solid transparent",
-                  padding: "6px 9px",
+                  padding: "5px 8px",
                   borderRadius: "6px",
                   cursor: "pointer",
                   fontSize: "11px",
@@ -425,7 +535,7 @@ function App() {
                   background: activeTab === "bank" ? "rgba(99, 102, 241, 0.2)" : "transparent",
                   color: activeTab === "bank" ? "var(--text-primary)" : "var(--text-muted)",
                   border: activeTab === "bank" ? "1px solid rgba(99, 102, 241, 0.4)" : "1px solid transparent",
-                  padding: "6px 9px",
+                  padding: "5px 8px",
                   borderRadius: "6px",
                   cursor: "pointer",
                   fontSize: "11px",
@@ -440,14 +550,29 @@ function App() {
                   background: activeTab === "reflect" ? "rgba(6, 182, 212, 0.2)" : "transparent",
                   color: activeTab === "reflect" ? "var(--accent-cyan)" : "var(--text-muted)",
                   border: activeTab === "reflect" ? "1px solid rgba(6, 182, 212, 0.4)" : "1px solid transparent",
-                  padding: "6px 9px",
+                  padding: "5px 8px",
                   borderRadius: "6px",
                   cursor: "pointer",
                   fontSize: "11px",
                   fontWeight: 600,
                 }}
               >
-                🔮 Reflection
+                🔮 Reflect
+              </button>
+              <button
+                onClick={() => setActiveTab("timeline")}
+                style={{
+                  background: activeTab === "timeline" ? "rgba(16, 185, 129, 0.2)" : "transparent",
+                  color: activeTab === "timeline" ? "var(--accent-emerald)" : "var(--text-muted)",
+                  border: activeTab === "timeline" ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid transparent",
+                  padding: "5px 8px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                }}
+              >
+                🗓️ Timeline
               </button>
             </div>
 
@@ -455,7 +580,7 @@ function App() {
             {activeTab === "live" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div className="section-label">
-                  Recalled Facts Used in Prompt
+                  Recalled Facts for {currentCustomer.name}
                 </div>
 
                 {liveMemories.length === 0 ? (
@@ -594,6 +719,47 @@ function App() {
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Tab 4: Chronological Incident Memory Timeline */}
+            {activeTab === "timeline" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div className="section-label">
+                  Incident Learning Timeline
+                </div>
+
+                <div style={{ position: "relative", paddingLeft: "16px", borderLeft: "2px solid rgba(99, 102, 241, 0.3)", display: "flex", flexDirection: "column", gap: "16px" }}>
+                  <div style={{ position: "relative" }}>
+                    <div style={{ position: "absolute", left: "-22px", top: "2px", width: "10px", height: "10px", borderRadius: "50%", background: "var(--accent-rose)" }}></div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Day 1 • 09:30 AM</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#fff", marginTop: "2px" }}>Initial Incident Outage</div>
+                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                      Redis Pod OOMKilled on {currentCustomer.cluster}. Worker node restarted; temporary limit raised to 1 GiB.
+                    </div>
+                    <span className="entity-pill" style={{ marginTop: "6px", display: "inline-block" }}>Retained to Bank</span>
+                  </div>
+
+                  <div style={{ position: "relative" }}>
+                    <div style={{ position: "absolute", left: "-22px", top: "2px", width: "10px", height: "10px", borderRadius: "50%", background: "var(--accent-amber)" }}></div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Day 4 • 02:15 PM</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#fff", marginTop: "2px" }}>Recurring Issue Detected</div>
+                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                      Hindsight matched exact cluster & historical runbook with 94% confidence. AI suggested permanent maxmemory configuration.
+                    </div>
+                    <span className="entity-pill" style={{ marginTop: "6px", display: "inline-block" }}>Recalled without prompt</span>
+                  </div>
+
+                  <div style={{ position: "relative" }}>
+                    <div style={{ position: "absolute", left: "-22px", top: "2px", width: "10px", height: "10px", borderRadius: "50%", background: "var(--accent-cyan)" }}></div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Today • Ongoing</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#fff", marginTop: "2px" }}>Agentic Post-Mortem Reflection</div>
+                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                      Generated long-term ElastiCache migration and node-isolation roadmap via hindsight.reflect().
+                    </div>
+                    <span className="entity-pill" style={{ marginTop: "6px", display: "inline-block" }}>Agent Learned</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>

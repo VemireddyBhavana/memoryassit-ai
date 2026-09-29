@@ -126,6 +126,12 @@ app.post("/api/reflect", async (req, res) => {
   }
 });
 
+// Reset Session Endpoint
+app.post("/api/reset", (req, res) => {
+  localFallbackMemories.length = 0;
+  res.json({ success: true, message: "Session cache reset successfully." });
+});
+
 // Primary Chat Endpoint with Multi-Tier Fallbacks
 app.post("/chat", async (req, res) => {
   const startTime = Date.now();
@@ -136,7 +142,7 @@ app.post("/chat", async (req, res) => {
       return res.status(400).json({ reply: "Message is required." });
     }
 
-    // 1. Recall from Hindsight Cloud (with Local Fallback)
+    // 1. Recall from Hindsight Cloud (Scoped to Customer)
     let memoryContext = "";
     let recalledItems = [];
     const recallStart = Date.now();
@@ -144,7 +150,9 @@ app.post("/chat", async (req, res) => {
 
     try {
       if (hindsight && process.env.HINDSIGHT_API_KEY) {
-        const recallResponse = await hindsight.recall(BANK_ID, message);
+        // Query Hindsight with customer identity context
+        const scopedQuery = `${customerId} ${message}`;
+        const recallResponse = await hindsight.recall(BANK_ID, scopedQuery);
         const items = Array.isArray(recallResponse)
           ? recallResponse
           : (recallResponse?.results || []);
