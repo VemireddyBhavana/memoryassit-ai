@@ -1,16 +1,22 @@
-# React + Vite
+# MemoryAssist AI - Frontend Web App 🖥️
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Modern, high-performance conversational AI interface with live vector memory inspection, built with **React 19** and **Vite**.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Live Hindsight Memory Inspector:** Side-by-side panel visualizing recalled memories, semantic similarity scores, entity tags, and total bank memories in real time.
+- **Interactive 60-Second Demo Story:** One-click scenario runner demonstrating multi-turn incident resolution and persistent cross-session memory recall.
+- **Enterprise Dark Design System:** Tailored dark glassmorphic interface utilizing Plus Jakarta Sans and JetBrains Mono typography.
+- **Instant Bank Synchronization:** Dedicated interactive sync button with spin animation and visual feedback connected directly to Hindsight Cloud.
 
-## React Compiler
+## Running Locally
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# Install dependencies
+npm install
 
-## Expanding the Oxlint configuration
+# Start development server
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Visit `http://localhost:5173/` in your browser.
