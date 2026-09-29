@@ -28,9 +28,12 @@ function App() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("live"); // 'live' or 'bank'
+  const [activeTab, setActiveTab] = useState("live"); // 'live', 'bank', or 'reflect'
   const [liveMemories, setLiveMemories] = useState([]);
   const [allBankMemories, setAllBankMemories] = useState([]);
+  const [bankSearch, setBankSearch] = useState("");
+  const [reflection, setReflection] = useState(null);
+  const [isReflecting, setIsReflecting] = useState(false);
   const [telemetry, setTelemetry] = useState({
     recallLatencyMs: null,
     totalLatencyMs: null,
@@ -146,6 +149,50 @@ function App() {
     }
   };
 
+  // Agentic Reflection using Hindsight's 3rd core verb: reflect()
+  const handleRunReflection = async () => {
+    setIsReflecting(true);
+    setActiveTab("reflect");
+    try {
+      const res = await fetch("http://localhost:5000/api/reflect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: "What is the recurring issue with this customer infrastructure and what long-term architectural change do you recommend?"
+        })
+      });
+      const data = await res.json();
+      setReflection(data.reflection);
+    } catch (e) {
+      console.error("Reflection error:", e);
+      setReflection("Unable to generate reflection. Please verify server connection.");
+    } finally {
+      setIsReflecting(false);
+    }
+  };
+
+  const handleExportReflection = () => {
+    if (!reflection) return;
+    const blob = new Blob([reflection], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `incident-postmortem-${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Filtered bank memories for search
+  const filteredMemories = allBankMemories.filter((mem) => {
+    if (!bankSearch.trim()) return true;
+    const q = bankSearch.toLowerCase();
+    return (
+      mem.text?.toLowerCase().includes(q) ||
+      String(mem.entities || "").toLowerCase().includes(q) ||
+      mem.fact_type?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="app-layout">
       <div className="ambient-glow" />
@@ -208,7 +255,7 @@ function App() {
           <div>
             <div className="section-label">60-Second Demo Story</div>
             <p style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px" }}>
-              Click each scenario in order to demonstrate persistent Hindsight memory to the judges:
+              Click scenarios to demonstrate persistent Hindsight memory to the judges:
             </p>
 
             {DEMO_SCENARIOS.map((scenario, index) => (
@@ -228,11 +275,31 @@ function App() {
                 <div className="scenario-desc">{scenario.desc}</div>
               </button>
             ))}
+
+            {/* Special Hindsight Reflect Feature (The 3rd Verb!) */}
+            <button
+              className="scenario-button"
+              style={{
+                background: "linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.2))",
+                borderColor: "rgba(99, 102, 241, 0.5)",
+                marginTop: "10px"
+              }}
+              onClick={handleRunReflection}
+              disabled={isReflecting}
+            >
+              <div className="scenario-title" style={{ color: "var(--accent-cyan)" }}>
+                <span>🔮 4. Executive Post-Mortem</span>
+                <span>{isReflecting ? "⏳" : "→"}</span>
+              </div>
+              <div className="scenario-desc">
+                Triggers <strong>hindsight.reflect()</strong> to synthesize root-cause & architectural analysis across all memories!
+              </div>
+            </button>
           </div>
 
           <div style={{ marginTop: "auto", fontSize: "11px", color: "var(--text-muted)", borderTop: "1px solid var(--border-color)", paddingTop: "12px" }}>
             <div>Powered by <strong>Hindsight (Vectorize)</strong></div>
-            <div>Active learning: Retain • Recall • Reflect</div>
+            <div>Full 3 Verbs: <strong>Retain • Recall • Reflect</strong></div>
           </div>
         </aside>
 
@@ -335,22 +402,22 @@ function App() {
               </div>
             </div>
 
-            {/* View Switcher Tabs */}
-            <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px" }}>
+            {/* View Switcher Tabs (Active Recall, Bank Explorer, Executive Reflection) */}
+            <div style={{ display: "flex", gap: "6px", borderBottom: "1px solid var(--border-color)", paddingBottom: "10px" }}>
               <button
                 onClick={() => setActiveTab("live")}
                 style={{
                   background: activeTab === "live" ? "rgba(99, 102, 241, 0.2)" : "transparent",
                   color: activeTab === "live" ? "var(--text-primary)" : "var(--text-muted)",
                   border: activeTab === "live" ? "1px solid rgba(99, 102, 241, 0.4)" : "1px solid transparent",
-                  padding: "6px 12px",
+                  padding: "6px 9px",
                   borderRadius: "6px",
                   cursor: "pointer",
-                  fontSize: "12px",
+                  fontSize: "11px",
                   fontWeight: 600,
                 }}
               >
-                Active Query Recall ({liveMemories.length})
+                Recall ({liveMemories.length})
               </button>
               <button
                 onClick={() => setActiveTab("bank")}
@@ -358,14 +425,29 @@ function App() {
                   background: activeTab === "bank" ? "rgba(99, 102, 241, 0.2)" : "transparent",
                   color: activeTab === "bank" ? "var(--text-primary)" : "var(--text-muted)",
                   border: activeTab === "bank" ? "1px solid rgba(99, 102, 241, 0.4)" : "1px solid transparent",
-                  padding: "6px 12px",
+                  padding: "6px 9px",
                   borderRadius: "6px",
                   cursor: "pointer",
-                  fontSize: "12px",
+                  fontSize: "11px",
                   fontWeight: 600,
                 }}
               >
-                Bank Explorer ({allBankMemories.length})
+                Explorer ({allBankMemories.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("reflect")}
+                style={{
+                  background: activeTab === "reflect" ? "rgba(6, 182, 212, 0.2)" : "transparent",
+                  color: activeTab === "reflect" ? "var(--accent-cyan)" : "var(--text-muted)",
+                  border: activeTab === "reflect" ? "1px solid rgba(6, 182, 212, 0.4)" : "1px solid transparent",
+                  padding: "6px 9px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                }}
+              >
+                🔮 Reflection
               </button>
             </div>
 
@@ -409,17 +491,34 @@ function App() {
               </div>
             )}
 
-            {/* Tab 2: Full Bank Memory Explorer */}
+            {/* Tab 2: Full Bank Memory Explorer with Live Keyword Filter */}
             {activeTab === "bank" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div className="section-label">
-                  All Persistent Memories in Hindsight Cloud
+                  Search Persistent Cloud Memories
                 </div>
 
-                {allBankMemories.length === 0 ? (
-                  <div className="empty-memory-state">Bank is currently empty.</div>
+                <input
+                  type="text"
+                  placeholder="Filter by keyword (e.g. redis, cluster, aws)..."
+                  value={bankSearch}
+                  onChange={(e) => setBankSearch(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "7px 10px",
+                    background: "rgba(30, 41, 59, 0.7)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "6px",
+                    color: "var(--text-primary)",
+                    fontSize: "11.5px",
+                    outline: "none",
+                  }}
+                />
+
+                {filteredMemories.length === 0 ? (
+                  <div className="empty-memory-state">No memories match '{bankSearch}'.</div>
                 ) : (
-                  allBankMemories.map((mem, idx) => (
+                  filteredMemories.map((mem, idx) => (
                     <div key={idx} className="memory-card" style={{ borderLeftColor: "var(--accent-purple)" }}>
                       <div className="memory-card-top">
                         <span className="memory-type-pill" style={{ background: "rgba(139, 92, 246, 0.2)", color: "#c084fc" }}>
@@ -439,6 +538,61 @@ function App() {
                       )}
                     </div>
                   ))
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Hindsight Agentic Reflection & Post-Mortem */}
+            {activeTab === "reflect" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="section-label" style={{ margin: 0 }}>
+                    Hindsight Agentic Reflection
+                  </div>
+                  {reflection && (
+                    <button
+                      onClick={handleExportReflection}
+                      className="refresh-btn"
+                      style={{ fontSize: "10.5px" }}
+                      title="Download Markdown Report"
+                    >
+                      📥 Export Post-Mortem
+                    </button>
+                  )}
+                </div>
+
+                {isReflecting ? (
+                  <div className="empty-memory-state" style={{ borderColor: "var(--accent-cyan)", color: "var(--accent-cyan)" }}>
+                    <div className="spin-icon spinning" style={{ fontSize: "20px", marginBottom: "8px" }}>🧠</div>
+                    <div>Executing <strong>hindsight.reflect()</strong>...</div>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                      Synthesizing root-cause analysis and architectural advice from all stored memories.
+                    </div>
+                  </div>
+                ) : reflection ? (
+                  <div
+                    className="memory-card"
+                    style={{
+                      borderLeftColor: "var(--accent-cyan)",
+                      background: "rgba(15, 23, 42, 0.8)",
+                      lineHeight: "1.6",
+                      fontSize: "12px",
+                      whiteSpace: "pre-wrap"
+                    }}
+                  >
+                    {reflection}
+                  </div>
+                ) : (
+                  <div className="empty-memory-state">
+                    <div>No reflection generated yet.</div>
+                    <button
+                      className="refresh-btn"
+                      style={{ marginTop: "10px" }}
+                      onClick={handleRunReflection}
+                    >
+                      🔮 Run Executive Reflection Now
+                    </button>
+                  </div>
                 )}
               </div>
             )}

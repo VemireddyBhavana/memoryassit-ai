@@ -96,6 +96,36 @@ app.get("/api/memories", async (req, res) => {
   });
 });
 
+// Hindsight Reflect Endpoint: Deep Agentic Reasoning Across All Memories
+app.post("/api/reflect", async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { query = "What is the recurring issue with this customer infrastructure and what long-term architectural change do you recommend?" } = req.body || {};
+
+    if (hindsight && process.env.HINDSIGHT_API_KEY) {
+      const reflectResponse = await hindsight.reflect(BANK_ID, query);
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        bankId: BANK_ID,
+        query,
+        reflection: reflectResponse.text || JSON.stringify(reflectResponse),
+        latencyMs,
+        source: "hindsight_reflect"
+      });
+    }
+
+    throw new Error("Hindsight client is not initialized.");
+  } catch (err) {
+    console.error("Reflect failed:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      reflection: "Unable to generate reflection at this time. Please check your Hindsight Cloud connection."
+    });
+  }
+});
+
 // Primary Chat Endpoint with Multi-Tier Fallbacks
 app.post("/chat", async (req, res) => {
   const startTime = Date.now();

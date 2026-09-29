@@ -32,7 +32,7 @@ Stateless chatbots treat every interaction as day zero. Standard RAG only search
 | Criteria | Weight | How MemoryAssist AI Delivers |
 | :--- | :---: | :--- |
 | **Innovation** | **30%** | Moves beyond conversational chatbots to an **Enterprise Memory Cockpit** with multi-session customer memory, real-time memory telemetry, and automated runbook generation. |
-| **Use of Hindsight Memory** | **25%** | Memory is the central star: Uses official `@vectorize-io/hindsight-client` for active `retain()` on every interaction and semantic/keyword `recall()` with a dedicated **Live Hindsight Memory Inspector** UI. |
+| **Use of Hindsight Memory** | **25%** | **Memory is the central star.** Implements the complete Hindsight trifecta: **`retain()`**, **`recall()`**, and **`reflect()`**. Includes live memory inspection, keyword bank search, and agentic post-mortem synthesis via `hindsight.reflect()`. |
 | **Technical Implementation** | **20%** | Clean separation of concerns (React 19 + Express), robust error handling, async memory retention, non-blocking telemetry, and real-time bank health checks. |
 | **User Experience (UX)** | **15%** | Ultra-sleek dark glassmorphic SaaS interface, dual-panel real-time memory inspector, 1-click 60-second interactive demo scenario buttons, and live latency counters. |
 | **Real-world Impact** | **10%** | Targets a high-value B2B workflow ($50+/seat enterprise support), cutting incident resolution time (MTTR) by up to 60%. |
