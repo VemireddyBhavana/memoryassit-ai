@@ -8,31 +8,40 @@ const localFallbackMemories = [
   },
 ];
 
-function findRelevantMemories(message) {
+function findRelevantMemories(message, userId) {
   const lower = message.toLowerCase();
   return localFallbackMemories.filter(
     (memory) =>
-      memory.entities?.some((entity) => lower.includes(entity.toLowerCase())) ||
-      lower.includes("cluster") ||
-      lower.includes("crash") ||
-      lower.includes("again") ||
-      lower.includes("name"),
+      memory.userId === userId &&
+      (memory.entities?.some((entity) => lower.includes(entity.toLowerCase())) ||
+        lower.includes("cluster") ||
+        lower.includes("crash") ||
+        lower.includes("again") ||
+        lower.includes("name")),
   );
 }
 
-function retainLocally(memory) {
+function retainLocally(memory, userId) {
+  memory.userId = userId;
   localFallbackMemories.unshift(memory);
-  if (localFallbackMemories.length > 50) {
-    localFallbackMemories.pop();
+  let count = 0;
+  for (const item of localFallbackMemories) {
+    if (item.userId === userId) count += 1;
+  }
+  if (count > 50) {
+    const oldest = localFallbackMemories.findLastIndex((item) => item.userId === userId);
+    if (oldest >= 0) localFallbackMemories.splice(oldest, 1);
   }
 }
 
-function listLocalMemories() {
-  return localFallbackMemories;
+function listLocalMemories(userId) {
+  return localFallbackMemories.filter((memory) => memory.userId === userId);
 }
 
-function resetLocalMemories() {
-  localFallbackMemories.length = 0;
+function resetLocalMemories(userId) {
+  for (let i = localFallbackMemories.length - 1; i >= 0; i -= 1) {
+    if (localFallbackMemories[i].userId === userId) localFallbackMemories.splice(i, 1);
+  }
 }
 
 module.exports = {

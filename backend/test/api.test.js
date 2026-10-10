@@ -22,50 +22,43 @@ after(async () => {
   });
 });
 
-test("existing API endpoints preserve their fallback behavior", async () => {
+test("health remains public and user data is unavailable without PostgreSQL", async () => {
   const healthResponse = await fetch(`${baseUrl}/api/health`);
   assert.equal(healthResponse.status, 200);
   assert.equal((await healthResponse.json()).status, "resilient_fallback");
 
-  const invalidChatResponse = await fetch(`${baseUrl}/chat`, {
+  const signupResponse = await fetch(`${baseUrl}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ displayName: "Test User", email: "test@example.com", password: "long-enough-password" }),
   });
-  assert.equal(invalidChatResponse.status, 400);
-  assert.equal((await invalidChatResponse.json()).reply, "Message is required.");
+  assert.equal(signupResponse.status, 503);
 
   const chatResponse = await fetch(`${baseUrl}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message: "Our production cluster crashed again.",
-      customerId: "cust-test",
-    }),
+    body: JSON.stringify({ message: "Our production cluster crashed again." }),
   });
-  const chat = await chatResponse.json();
-  assert.equal(chatResponse.status, 200);
-  assert.equal(chat.telemetry.llmSource, "resilient_local_engine");
-  assert.equal(chat.telemetry.retained, true);
-  assert.ok(chat.recalledMemories.length > 0);
+  assert.equal(chatResponse.status, 503);
+
+  const conversationsResponse = await fetch(`${baseUrl}/api/conversations`);
+  assert.equal(conversationsResponse.status, 503);
 
   const memoriesResponse = await fetch(`${baseUrl}/api/memories`);
-  const memories = await memoriesResponse.json();
-  assert.equal(memories.source, "local_resilient_cache");
-  assert.ok(memories.items.some((memory) => memory.text.includes("cust-test")));
+  assert.equal(memoriesResponse.status, 503);
+});
 
+test("credential validation rejects weak or malformed signup data", () => {
+  const { validateCredentials } = require("../src/validators/authValidator");
+  assert.equal(validateCredentials({ displayName: "A", email: "not-an-email", password: "short" }, true).valid, false);
+  assert.equal(validateCredentials({ displayName: "Test User", email: "test@example.com", password: "long-enough-password" }, true).valid, true);
+});
+
+test("reflection reports unavailable when unauthenticated or database is not configured", async () => {
   const reflectResponse = await fetch(`${baseUrl}/api/reflect`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query: "Summarize the incident history." }),
   });
-  assert.equal(reflectResponse.status, 500);
-  assert.equal((await reflectResponse.json()).success, false);
-
-  const resetResponse = await fetch(`${baseUrl}/api/reset`, { method: "POST" });
-  assert.equal(resetResponse.status, 200);
-  assert.equal((await resetResponse.json()).success, true);
-
-  const afterResetResponse = await fetch(`${baseUrl}/api/memories`);
-  assert.deepEqual((await afterResetResponse.json()).items, []);
+  assert.equal(reflectResponse.status, 503);
 });

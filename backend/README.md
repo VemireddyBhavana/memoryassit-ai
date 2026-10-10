@@ -1,6 +1,6 @@
 # MemoryAssist AI Backend
 
-Express service that combines Hindsight memory recall/retention with Groq response generation. It keeps an in-memory fallback cache so the demo can still respond when cloud credentials or connectivity are unavailable.
+Express service that combines Hindsight memory recall/retention with Groq response generation. PostgreSQL stores accounts, opaque login sessions, conversations, messages, user memory records, and settings.
 
 ## Architecture
 
@@ -10,6 +10,7 @@ Express service that combines Hindsight memory recall/retention with Groq respon
 - `src/routes/` maps the existing API paths to controllers.
 - `src/controllers/` handles HTTP request and response behavior.
 - `src/services/` contains Hindsight, Groq, and local fallback-memory operations.
+- `src/db/` contains the PostgreSQL pool and idempotent schema setup.
 - `src/middleware/` provides JSON error handling and unknown-route responses.
 - `src/validators/` validates chat and reflection request bodies.
 - `src/utils/` contains shared prompt construction.
@@ -23,13 +24,17 @@ The existing integration flow is preserved: `/chat` recalls relevant memory from
 - `GET /api/memories` — lists Hindsight memories, falling back to the local cache.
 - `POST /api/reflect` — accepts an optional `{ "query": "..." }` and requests a Hindsight reflection.
 - `POST /api/reset` — clears the in-memory fallback cache.
+- `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` — account and session endpoints.
+- `/api/conversations` — authenticated conversation create/list/read/update/delete endpoints; messages are stored with each conversation.
+- `/api/profile` and `/api/settings` — authenticated profile and theme preferences.
+- `/api/memories` — authenticated user memory records with create, list, update, and delete operations. Provider memories are returned read-only as `hindsight` / `items`.
 
 ## Run locally
 
 ```powershell
 npm install
 Copy-Item .env.example .env
-# Add your service credentials to .env
+# Set DATABASE_URL and SESSION_SECRET, then add Groq/Hindsight service credentials.
 npm start
 ```
 
@@ -42,11 +47,15 @@ Environment variables:
 - `HINDSIGHT_BASE_URL` — Hindsight API base URL.
 - `HINDSIGHT_BANK_ID` — memory bank identifier.
 - `PORT` — HTTP port (default `5000`).
+- `DATABASE_URL` — PostgreSQL connection string. Required for auth and saved data.
+- `SESSION_SECRET` — random secret reserved for future signing use (required in production).
+- `CLIENT_ORIGIN` — allowed frontend origins, comma-separated if needed.
+- `DATABASE_SSL` — set `true` when the managed PostgreSQL provider requires TLS.
 
 ## Test
 
-Run `npm test`. The integration test exercises the HTTP routes using the local fallback path and does not require live cloud credentials.
+Run `npm test`. Tests for routes not requiring a database run without external credentials. Configure PostgreSQL to exercise account and persistence flows.
 
 ## Current scope
 
-This phase reorganizes the existing service without adding authentication, persistent application database storage, or user-scoped data. The fallback memory cache is process-local and is cleared when the server restarts.
+Hindsight banks are namespaced per user; app-managed memory records are stored in PostgreSQL. The fallback response cache is process-local and is cleared when the server restarts. Configure TLS, backups, trusted origins, and deployment secrets for production.

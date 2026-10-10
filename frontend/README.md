@@ -1,43 +1,36 @@
 # MemoryAssist AI — Frontend
 
-React 19 + Vite frontend for the MemoryAssist AI enterprise support cockpit.
+React 19 + Vite frontend for the MemoryAssist AI authenticated support workspace.
 
 ## Stack
 
-- **React 19** — UI framework
-- **Vite 8** — build tool and dev server
-- **React Router** — client-side page routing
-- **Vanilla CSS** — full custom glassmorphic dark design system
+- React 19 and Vite 8
+- React Router for page routing
+- Vanilla CSS design system with persisted light/dark preference
 
 ## Development
 
 ```bash
 npm install
 npm run dev
-# ➜ Local: http://localhost:5173/
+# Local: http://localhost:5173/
 ```
 
-The frontend expects the backend running on `http://localhost:5000`. Set
-`VITE_API_URL` in a frontend `.env` file to use a different backend URL.
-See the [root README](../README.md) for full setup instructions.
+Start PostgreSQL and the backend first (see the [root README](../README.md)). The API defaults to `http://localhost:5000`. Set `VITE_API_URL` in `frontend/.env` to use a different backend URL.
 
 ## Frontend structure
 
 - `src/main.jsx` — React entry point.
-- `src/routes/AppRoutes.jsx` — public, workspace, and chat routes.
-- `src/pages/` — landing, login/signup placeholders, dashboard, existing chat cockpit, memories, profile, and settings pages.
-- `src/layouts/AppLayout.jsx` — shared navigation and layout for workspace pages.
-- `src/components/PlaceholderPage.jsx` — reusable placeholder page used by unfinished areas.
-- `src/services/api.js` — shared calls to the existing Express API.
-- `src/hooks/useBackendOverview.js` — reusable health and memory-bank refresh state.
+- `src/routes/AppRoutes.jsx` — route definitions and auth provider.
+- `src/pages/` — landing, login, signup, dashboard, chat, memories, profile, and settings pages.
+- `src/layouts/AppLayout.jsx` — shared navigation and workspace layout.
+- `src/components/` — protected-route and shared UI components.
+- `src/contexts/` and `src/hooks/` — authentication state and reusable hooks.
+- `src/services/api.js` — cookie-enabled API calls to Express.
+- `src/hooks/useBackendOverview.js` — backend health and memory refresh state.
 - `src/index.css` — shared design system and routed-page styles.
-- `index.html` — HTML entry point.
-- `vite.config.js` — Vite configuration.
 
-The existing chat cockpit is available at `/chat`; the landing page is `/`.
-The login, signup, memories, profile, and settings routes are placeholders only.
-Authentication, persistent user conversations, and memory editing are not part
-of this frontend restructuring phase.
+The landing page is `/`. The authenticated dashboard and product pages are `/dashboard`, `/chat`, `/memories`, `/profile`, and `/settings`. Login and signup are at `/login` and `/signup`.
 
 ## Checks
 

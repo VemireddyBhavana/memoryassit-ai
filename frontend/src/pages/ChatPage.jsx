@@ -1,11 +1,18 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
+  createConversation,
   createReflection,
+  deleteConversation,
+  getConversation,
+  getConversations,
   resetMemorySession,
-  sendChat,
+  renameConversation,
+  sendConversationMessage,
 } from "../services/api.js";
 import useBackendOverview from "../hooks/useBackendOverview.js";
+import useAuth from "../hooks/useAuth.js";
 
 // ── Simple Markdown Renderer ─────────────────────────────────────────────────
 function MarkdownText({ text }) {
@@ -91,7 +98,11 @@ function ToastContainer({ toasts, onDismiss }) {
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 function App() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [selectedCustomerId, setSelectedCustomerId] = useState("cust-nexus-01");
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(null);
   const currentCustomer = CUSTOMERS.find(c => c.id === selectedCustomerId) || CUSTOMERS[0];
 
   const [messages, setMessages] = useState([{
@@ -150,6 +161,11 @@ function App() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
   useEffect(() => { fetchHealthAndMemories({ showLoading: false }); }, [fetchHealthAndMemories]);
+  useEffect(() => {
+    getConversations()
+      .then((result) => setConversations(result.conversations))
+      .catch((error) => pushToast(error.message, "error", "⚠️"));
+  }, [pushToast]);
 
   useEffect(() => {
     if (!incidentStartTime) return;
@@ -162,10 +178,80 @@ function App() {
 
   const handleCustomerSwitch = (customerId) => {
     setSelectedCustomerId(customerId);
+    setActiveConversationId(null);
     const target = CUSTOMERS.find(c => c.id === customerId) || CUSTOMERS[0];
     setMessages([{ role: "assistant", content: `Switched customer context to **${target.name}** (${target.tier}).\n\nHindsight memory is now scoped to **${target.industry}**. How can I help?`, memoriesUsed: [], retained: false }]);
     setLiveMemories([]); setReflection(null);
     pushToast(`Switched to ${target.name}`, "success", "🏢");
+  };
+
+  const handleNewConversation = async () => {
+    try {
+      const result = await createConversation(selectedCustomerId);
+      setConversations((previous) => [result.conversation, ...previous]);
+      setActiveConversationId(result.conversation.id);
+      setMessages([{
+        role: "assistant",
+        content: `New conversation for **${currentCustomer.name}**. How can I help?`,
+        memoriesUsed: [],
+        retained: false,
+      }]);
+      setLiveMemories([]);
+      setReflection(null);
+    } catch (error) {
+      pushToast(error.message, "error", "⚠️");
+    }
+  };
+
+  const handleOpenConversation = async (conversationId) => {
+    try {
+      const result = await getConversation(conversationId);
+      setActiveConversationId(conversationId);
+      setSelectedCustomerId(result.conversation.customer_id);
+      setMessages(result.messages.length ? result.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+        memoriesUsed: [],
+        retained: message.role === "assistant",
+      })) : [{
+        role: "assistant",
+        content: `Continue your conversation for **${CUSTOMERS.find((customer) => customer.id === result.conversation.customer_id)?.name || result.conversation.customer_id}.`,
+        memoriesUsed: [],
+        retained: false,
+      }]);
+      setLiveMemories([]);
+    } catch (error) {
+      pushToast(error.message, "error", "⚠️");
+    }
+  };
+
+  const handleRenameConversation = async (conversation) => {
+    const title = window.prompt("Conversation name", conversation.title);
+    if (!title || title.trim() === conversation.title) return;
+    try {
+      const result = await renameConversation(conversation.id, title.trim());
+      setConversations((previous) => previous.map((item) => item.id === conversation.id ? result.conversation : item));
+    } catch (error) {
+      pushToast(error.message, "error", "⚠️");
+    }
+  };
+
+  const handleDeleteConversation = async (conversationId) => {
+    try {
+      await deleteConversation(conversationId);
+      setConversations((previous) => previous.filter((item) => item.id !== conversationId));
+      if (activeConversationId === conversationId) {
+        setActiveConversationId(null);
+        setMessages([{
+          role: "assistant",
+          content: `Hello! I am **MemoryAssist AI**. How can I help ${user?.display_name || "you"} today?`,
+          memoriesUsed: [],
+          retained: false,
+        }]);
+      }
+    } catch (error) {
+      pushToast(error.message, "error", "⚠️");
+    }
   };
 
   const handleSend = async (messageText = input) => {
@@ -176,7 +262,14 @@ function App() {
     setMessages(prev => [...prev, { role: "user", content: textToSend }]);
     setLoading(true);
     try {
-      const data = await sendChat(textToSend, selectedCustomerId);
+      let conversationId = activeConversationId;
+      if (!conversationId) {
+        const created = await createConversation(selectedCustomerId);
+        conversationId = created.conversation.id;
+        setActiveConversationId(conversationId);
+        setConversations((previous) => [created.conversation, ...previous]);
+      }
+      const data = await sendConversationMessage(conversationId, textToSend, selectedCustomerId);
       const newAiIdx = newUserIdx + 1;
       setMessages(prev => [...prev, { role: "assistant", content: data.reply, memoriesUsed: data.recalledMemories || [], retained: true }]);
       if (data.recalledMemories?.length > 0) {
@@ -194,10 +287,11 @@ function App() {
       setRetainedMsgIdx(newAiIdx);
       setTimeout(() => setRetainedMsgIdx(null), 3500);
       pushToast("Memory retained to Hindsight Bank", "success", "✅");
+      getConversations().then((result) => setConversations(result.conversations));
       setTimeout(fetchHealthAndMemories, 1200);
-    } catch {
+    } catch (error) {
       setMessages(prev => [...prev, { role: "assistant", content: "⚠️ Unable to reach MemoryAssist backend. Please ensure the server is running on port 5000.", memoriesUsed: [], retained: false }]);
-      pushToast("Backend unreachable — check port 5000", "error", "⚠️");
+      pushToast(error.message || "Unable to send message.", "error", "⚠️");
     } finally { setLoading(false); }
   };
 
@@ -233,6 +327,7 @@ function App() {
     setSpeakingIndex(null);
     try { await resetMemorySession(); } catch {}
     setMessages([{ role: "assistant", content: `Session reset! Clean slate initialized for **${currentCustomer.name}**. Ready for a fresh demo test.`, memoriesUsed: [], retained: false }]);
+    setActiveConversationId(null);
     setLiveMemories([]); setReflection(null); setLatencyHistory([]);
     pushToast("Session cleared & reset", "info", "🧹");
   };
@@ -290,6 +385,8 @@ function App() {
           <div className="tech-badge">⚡ Groq GPT-OSS</div>
           <button onClick={handleExportChat} className="refresh-btn" title="Export chat transcript"><span>💬 Export Chat</span></button>
           <button onClick={handleResetSession} className="refresh-btn" style={{borderColor:"rgba(244,63,94,0.4)",color:"#fda4af"}} title="Reset session"><span>🧹 Reset</span></button>
+          <span className="chat-account-name">{user?.display_name}</span>
+          <button onClick={async()=>{try{await logout();navigate("/",{replace:true});}catch(error){pushToast(error.message,"error","⚠️");}}} className="refresh-btn" title="Log out"><span>Log out</span></button>
         </div>
       </header>
 
@@ -297,6 +394,23 @@ function App() {
       <div className="main-grid">
         {/* Left Sidebar */}
         <aside className="sidebar-panel">
+          <section className="conversation-list">
+            <div className="conversation-heading">
+              <div className="section-label">Your conversations</div>
+              <button type="button" className="new-conversation-button" onClick={handleNewConversation}>+ New</button>
+            </div>
+            {conversations.length === 0 && <p className="conversation-empty">Your saved chats will appear here.</p>}
+            {conversations.map((conversation) => (
+              <div className={`conversation-item ${conversation.id === activeConversationId ? "selected" : ""}`} key={conversation.id}>
+                <button type="button" className="conversation-open" onClick={() => handleOpenConversation(conversation.id)}>
+                  <span>{conversation.title}</span>
+                  <small>{conversation.customer_id}</small>
+                </button>
+                <button type="button" className="conversation-action" title="Rename conversation" onClick={() => handleRenameConversation(conversation)}>✎</button>
+                <button type="button" className="conversation-action delete" title="Delete conversation" onClick={() => handleDeleteConversation(conversation.id)}>×</button>
+              </div>
+            ))}
+          </section>
           <div>
             <div className="section-label">Active Customer Context</div>
             <div className="customer-card">

@@ -26,6 +26,7 @@
 - [Demo Walkthrough](#-demo-walkthrough-60-seconds)
 - [Hindsight Integration](#-hindsight-integration)
 - [Resilience & Fallbacks](#-resilience--fallbacks)
+- [Project Status & Roadmap](#-project-status--roadmap)
 - [Lessons Learned](#-lessons-learned)
 - [Resources](#-resources)
 
@@ -170,31 +171,32 @@ Each conversation makes the agent smarter. **Memory compounds.**
 ┌─────────────────────────────────────────────────────────┐
 │                EXPRESS.JS BACKEND (Node.js)              │
 │                                                         │
-│  POST /chat ──────────────────────────────────────────► │
-│    1. recall(bankId, customerId + message)               │
-│    2. build system prompt with recalled memories         │
-│    3. groq.chat.completions.create(...)                  │
-│    4. retain(bankId, interaction) [async, non-blocking]  │
-│    5. return reply + recalledMemories + telemetry        │
+│  Auth → owned conversation → chat service               │
+│    1. recall from user-namespaced Hindsight bank         │
+│    2. generate reply with Groq or configured fallback    │
+│    3. persist both messages and user memory in Postgres  │
+│    4. retain interaction to Hindsight                    │
 │                                                         │
-│  GET  /api/health  → Hindsight + Groq connectivity      │
-│  GET  /api/memories → List all bank memories            │
-│  POST /api/reflect → Run agentic post-mortem            │
-│  POST /api/reset  → Clear session cache                 │
+│  Auth, conversation, profile, settings, memory APIs      │
+│  Health endpoint remains public                         │
 └──────────┬─────────────────────────┬────────────────────┘
            │                         │
            ▼                         ▼
-┌──────────────────┐    ┌────────────────────────────────┐
-│   GROQ CLOUD     │    │   HINDSIGHT CLOUD MEMORY BANK  │
-│                  │    │   Bank ID: MemoryAssist-AI      │
-│  Model:          │    │                                 │
-│  openai/         │    │  • Semantic vector search       │
-│  gpt-oss-120b    │    │  • Entity extraction & tagging  │
-│                  │    │  • Confidence scoring           │
-│  Fast inference  │    │    (semantic + reranker)        │
-│  ~500ms P99      │    │  • Persistent cross-session     │
-│                  │    │  • 112+ facts indexed           │
-└──────────────────┘    └────────────────────────────────┘
+┌────────────────────┐    ┌────────────────────────────────┐
+│   POSTGRESQL       │    │   HINDSIGHT CLOUD MEMORY BANK  │
+│                    │    │   Per-user namespaced banks    │
+│ • Users/sessions   │    │ • Semantic recall              │
+│ • Conversations    │    │ • Persistent retained facts    │
+│ • Messages         │    │ • Reflection                    │
+│ • Preferences      │    └────────────────────────────────┘
+│ • User memories    │
+└────────────────────┘
+           │
+           ▼
+┌──────────────────┐
+│   GROQ CLOUD     │
+│   LLM inference  │
+└──────────────────┘
 ```
 
 ---
@@ -228,9 +230,9 @@ Each conversation makes the agent smarter. **Memory compounds.**
 
 | Feature | Description |
 |---------|-------------|
-| **4-Tier Fallback** | Hindsight Cloud → local keyword cache → LLM-free memory response → static message. Never shows a 500 error. |
-| **Async Retain** | `retain()` uses `.catch()` so cloud write failures never impact the user response. |
-| **Local Memory Cache** | In-memory fallback store (up to 50 entries) ensures continuity if cloud is unreachable. |
+| **Provider Fallbacks** | Local response and memory behavior can be used when Hindsight or Groq is unavailable; database persistence failures are reported rather than silently treated as saved. |
+| **Best-effort Cloud Retain** | Hindsight retention runs asynchronously after the conversation is persisted. |
+| **Local Fallback Memory** | The fallback memory store is process-local and is lost when the backend restarts. |
 
 ---
 
@@ -257,28 +259,33 @@ Each conversation makes the agent smarter. **Memory compounds.**
 memoryassist-ai/
 │
 ├── 📄 README.md                   ← This file
-├── 📄 article.md                  ← Technical blog article (content submission)
-├── 📄 social_and_video.md         ← LinkedIn post + video script + YouTube titles
-├── 📄 .gitignore                  ← Ignores node_modules, .env, dist, logs
+├── 📄 docker-compose.yml          ← Local PostgreSQL service
+├── 📄 .gitignore                  ← Ignores generated files and secrets
 │
 ├── 📁 backend/
-│   ├── 📄 server.js               ← Main Express server
-│   │     ├── POST /chat           → recall → inject → generate → retain
-│   │     ├── GET  /api/health     → Hindsight + Groq connectivity
-│   │     ├── GET  /api/memories   → List all bank memories
-│   │     ├── POST /api/reflect    → Agentic post-mortem synthesis
-│   │     └── POST /api/reset      → Clear local session cache
+│   ├── 📄 server.js               ← Environment and server startup
+│   ├── 📁 src/config/             ← Environment and AI client settings
+│   ├── 📁 src/controllers/        ← HTTP handlers
+│   ├── 📁 src/db/                 ← PostgreSQL pool and schema initialization
+│   ├── 📁 src/middleware/         ← Session, auth, errors, and routing
+│   ├── 📁 src/routes/             ← API route definitions
+│   ├── 📁 src/services/           ← Groq, Hindsight, and session services
+│   ├── 📁 src/validators/         ← Request validation
+│   └── 📁 test/                   ← API and optional PostgreSQL integration tests
 │   ├── 📄 package.json
 │   ├── 📄 .env.example            ← Template — copy this to .env
 │   └── 📄 README.md
 │
 └── 📁 frontend/
     ├── 📁 src/
-    │   ├── 📄 App.jsx             ← Main React app (644 lines)
-    │   │     ├── MarkdownText     → Inline markdown renderer
-    │   │     ├── ToastContainer   → Toast notification system
-    │   │     └── App              → Main component (chat + inspector)
-    │   └── 📄 index.css           ← Full design system (CSS variables, animations)
+    │   ├── 📁 components/         ← Shared UI and route guards
+    │   ├── 📁 contexts/           ← Authentication provider
+    │   ├── 📁 hooks/              ← Auth and reusable data hooks
+    │   ├── 📁 layouts/            ← Workspace layout
+    │   ├── 📁 pages/              ← Landing and authenticated pages
+    │   ├── 📁 routes/             ← React Router configuration
+    │   ├── 📁 services/           ← Backend API client
+    │   └── 📄 index.css           ← Shared UI design system
     ├── 📄 index.html
     ├── 📄 vite.config.js
     ├── 📄 package.json
@@ -294,6 +301,7 @@ memoryassist-ai/
 Make sure you have the following before starting:
 
 - **Node.js** v18 or higher → [nodejs.org](https://nodejs.org)
+- **PostgreSQL** 14 or higher (or Docker Desktop for the included local database service)
 - **Groq API Key** → Free at [console.groq.com](https://console.groq.com) (generous free tier)
 - **Hindsight Cloud API Key & Bank ID** → [ui.hindsight.vectorize.io](https://ui.hindsight.vectorize.io) (use promo code `MEMHACK99` for $50 free credits)
 
@@ -308,7 +316,17 @@ cd memoryassit-ai
 
 ---
 
-### Step 2 — Set Up the Backend
+### Step 2 — Start PostgreSQL
+
+From the repository root, start the included PostgreSQL 16 service:
+
+```bash
+docker compose up -d postgres
+```
+
+The local compose defaults are for development only. Change the default database password before exposing this service or using it outside a local machine.
+
+### Step 3 — Set Up the Backend
 
 ```bash
 cd backend
@@ -333,7 +351,13 @@ HINDSIGHT_API_KEY=hsk_your_hindsight_api_key_here
 HINDSIGHT_BASE_URL=https://api.hindsight.vectorize.io
 HINDSIGHT_BANK_ID=MemoryAssist-AI
 PORT=5000
+DATABASE_URL=postgresql://memoryassist:local_dev_only_change_me@localhost:5432/memoryassist
+SESSION_SECRET=replace_with_a_random_secret_at_least_32_characters
+CLIENT_ORIGIN=http://localhost:5173
+DATABASE_SSL=false
 ```
+
+Use a unique random `SESSION_SECRET` in any non-local environment. Backend startup creates missing tables automatically; production deployments should use versioned migrations instead.
 
 Start the backend:
 
@@ -348,7 +372,7 @@ You should see:
 
 ---
 
-### Step 3 — Set Up the Frontend
+### Step 4 — Set Up the Frontend
 
 Open a **new terminal window**:
 
@@ -367,7 +391,7 @@ You should see:
 
 ---
 
-### Step 4 — Open the App
+### Step 5 — Open the App
 
 Go to **[http://localhost:5173](http://localhost:5173)** in your browser.
 
@@ -382,27 +406,53 @@ All environment variables live in `backend/.env`. Here's what each one does:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GROQ_API_KEY` | ✅ Yes | Your Groq API key for LLM inference. Get it free at [console.groq.com](https://console.groq.com) |
-| `HINDSIGHT_API_KEY` | ✅ Yes | Your Hindsight Cloud API key. Get it at [ui.hindsight.vectorize.io](https://ui.hindsight.vectorize.io) |
-| `HINDSIGHT_BASE_URL` | ✅ Yes | Hindsight Cloud API base URL. Default: `https://api.hindsight.vectorize.io` |
-| `HINDSIGHT_BANK_ID` | ✅ Yes | The name of your memory bank. Default: `MemoryAssist-AI`. You can change this to any name. |
+| `GROQ_API_KEY` | For live Groq replies | Your Groq API key. The backend has fallback response behavior when live inference is unavailable. |
+| `HINDSIGHT_API_KEY` | For live Hindsight | Your Hindsight Cloud API key. Local fallback memory behavior is used when unavailable. |
+| `HINDSIGHT_BASE_URL` | Optional | Hindsight Cloud API base URL. Default: `https://api.hindsight.vectorize.io` |
+| `HINDSIGHT_BANK_ID` | Optional | Base memory bank identifier. Default: `MemoryAssist-AI`; user banks are separately namespaced. |
 | `PORT` | Optional | Backend server port. Default: `5000` |
+| `DATABASE_URL` | Account and saved data | PostgreSQL connection string. Required for authentication and persisted user data. |
+| `SESSION_SECRET` | Required in production | Random secret used to protect session token hashes. Use a unique value with at least 32 characters. |
+| `CLIENT_ORIGIN` | Optional | Allowed browser origin(s), comma-separated. Set explicitly for deployment. |
+| `DATABASE_SSL` | Optional | Set to `true` when the PostgreSQL host requires TLS. |
+| `VITE_API_URL` | Optional | Frontend API base URL; defaults to `http://localhost:5000`. Configure via `frontend/.env`. |
 
 > ⚠️ **Security:** The `.env` file is in `.gitignore` and will never be committed. Never share your API keys publicly.
+
+### Account and workspace API
+
+All endpoints are under `/api`. Signup and login set an HTTP-only session cookie; browser requests include it automatically.
+
+| Method | Endpoint | Access | Purpose |
+|--------|----------|--------|---------|
+| `POST` | `/api/auth/signup` | Public | Create an account |
+| `POST` | `/api/auth/login` | Public | Sign in |
+| `POST` | `/api/auth/logout` | Public | End the current session |
+| `GET` | `/api/auth/me` | Signed in | Read the current account |
+| `GET`, `POST` | `/api/conversations` | Signed in | List or create conversations |
+| `GET`, `PATCH`, `DELETE` | `/api/conversations/:id` | Signed in | Read, rename, or delete an owned conversation |
+| `POST` | `/api/conversations/:id/messages` | Signed in | Chat in a saved conversation |
+| `GET`, `PATCH` | `/api/profile` | Signed in | Read or update profile |
+| `GET`, `PATCH` | `/api/settings` | Signed in | Read or update preferences |
+| `GET`, `POST` | `/api/memories` | Signed in | List or create app-managed memory records |
+| `PATCH`, `DELETE` | `/api/memories/:id` | Signed in | Update or delete an owned memory record |
+| `GET` | `/api/hindsight/memories` | Signed in | Read Hindsight provider memories |
+| `POST` | `/api/reflect` | Signed in | Request Hindsight reflection |
 
 ---
 
 ## 🛠️ API Reference
 
-### `POST /chat`
+### Chat endpoints
 
-The primary endpoint. Executes the full **recall → inject → generate → retain** pipeline.
+Use `POST /api/conversations/:id/messages` for a saved conversation. `POST /chat` remains as an authenticated compatibility endpoint and requires `conversationId` in its JSON body. Both execute the full **recall → generate → persist → retain** pipeline and require a signed-in user and an owned conversation.
 
 **Request Body:**
 ```json
 {
   "message": "Our cluster crashed again with the same OOM error.",
-  "customerId": "cust-nexus-01"
+  "customerId": "cust-nexus-01",
+  "conversationId": "your-owned-conversation-uuid"
 }
 ```
 
@@ -410,6 +460,7 @@ The primary endpoint. Executes the full **recall → inject → generate → ret
 |-------|------|----------|-------------|
 | `message` | string | ✅ | The user's message |
 | `customerId` | string | Optional | Customer identifier for memory scoping. Default: `cust-nexus-01` |
+| `conversationId` | string | Required for `POST /chat` | ID of a conversation owned by the signed-in user. The `/api/conversations/:id/messages` path supplies it in the URL. |
 
 **Response:**
 ```json
@@ -483,33 +534,13 @@ Returns connectivity status for all services. Always returns 200 — never crash
 
 ---
 
-### `GET /api/memories`
-
-Lists all memories stored in the Hindsight memory bank. Falls back to local cache if cloud is unreachable.
-
-**Response:**
-```json
-{
-  "success": true,
-  "bankId": "MemoryAssist-AI",
-  "source": "hindsight_cloud",
-  "items": [
-    {
-      "id": "uuid",
-      "text": "Production cluster eks-prod-us-east-1 had OOMKilled error on Redis pod.",
-      "type": "world",
-      "entities": ["eks-prod-us-east-1", "Redis"],
-      "mentioned_at": "2026-09-29T07:17:21.928518+00:00"
-    }
-  ]
-}
-```
+`GET /api/memories` lists the signed-in user's app-managed memory records. Use `GET /api/hindsight/memories` to read provider memories. Hindsight memories are read-only in the application; users may edit/delete only their own app-managed records.
 
 ---
 
 ### `POST /api/reflect`
 
-Triggers `hindsight.reflect()` — agentic synthesis across **all** stored memories to generate executive post-mortems and long-term recommendations.
+Triggers `hindsight.reflect()` for the signed-in user's namespaced memory bank — agentic synthesis to generate post-mortems and recommendations. Requires authentication.
 
 **Request Body:**
 ```json
@@ -534,7 +565,7 @@ Triggers `hindsight.reflect()` — agentic synthesis across **all** stored memor
 
 ### `POST /api/reset`
 
-Clears the local in-memory session cache. Useful for demo resets. Does NOT delete Hindsight Cloud memories.
+Resets the signed-in user's local fallback memory state. It does not delete PostgreSQL conversation history or Hindsight Cloud memories.
 
 **Response:**
 ```json
@@ -611,7 +642,7 @@ What happens:
 ### `retain()` — Write to Long-Term Memory
 
 ```javascript
-// backend/server.js
+// Called by backend/src/services/hindsightService.js after the chat is persisted
 const interactionText = `Customer [${customerId}]: ${message}\nAgent: ${reply}`;
 
 // Async — never blocks the user response
@@ -629,7 +660,7 @@ if (hindsight && process.env.HINDSIGHT_API_KEY) {
 ### `recall()` — Read Relevant Memories
 
 ```javascript
-// backend/server.js
+// Implemented by backend/src/services/hindsightService.js
 // Customer ID is prefixed to the query for natural memory scoping
 const scopedQuery = `${customerId} ${message}`;
 const recallResponse = await hindsight.recall(BANK_ID, scopedQuery);
@@ -653,7 +684,7 @@ if (items.length > 0) {
 ### `reflect()` — Agentic Synthesis
 
 ```javascript
-// backend/server.js
+// Implemented by backend/src/services/hindsightService.js
 const reflectResponse = await hindsight.reflect(BANK_ID, query);
 // Returns synthesized insights, root-cause analysis, recommendations
 // across the ENTIRE memory bank — not just a search result
@@ -666,7 +697,7 @@ const reflectResponse = await hindsight.reflect(BANK_ID, query);
 ### Memory Injection into System Prompt
 
 ```javascript
-// backend/server.js
+// Implemented by backend/src/services/groqService.js using recalled memory context
 const completion = await groq.chat.completions.create({
   model: "openai/gpt-oss-120b",
   messages: [
@@ -705,6 +736,47 @@ Tier 4: Static fallback message ("Your request has been safely queued")
 ```
 
 This matters in production environments where network hiccups, rate limits, and cold starts are expected.
+
+---
+
+## 🧭 Project Status & Roadmap
+
+### Already completed
+
+- **Backend refactor:** The Express server is split into routes, controllers, services, middleware, validators, configuration, and utilities.
+- **Existing AI flow retained:** Chat uses Hindsight `recall()` and `retain()`, Groq for response generation, and a local fallback.
+- **Frontend structure:** The existing chat cockpit is at `/chat`. React Router provides the landing page, dashboard, and routes for Login, Signup, Memories, Profile, and Settings.
+- **Backend API service:** Frontend API calls are centralized, and the backend URL can be configured with `VITE_API_URL`.
+- **Authentication and persistence:** PostgreSQL-backed signup/login/logout, password hashing, HTTP-only session cookies, protected routes, and user-scoped accounts, conversations, messages, profile, settings, and app-managed memories are implemented.
+- **Frontend workspace:** The dashboard, chat, memory library, profile, and settings pages are connected to the authenticated API. Light/dark preference is persisted per user.
+- **AI flow:** Authenticated chat loads the user's saved conversation, recalls user-scoped Hindsight and app-managed memories, generates a reply with Groq when configured, saves messages, and retains the interaction.
+- **Checks:** Backend tests and the frontend production build pass. The PostgreSQL integration test is skipped unless `DATABASE_URL` is configured. Live database and Hindsight/Groq browser behavior still need deployment-environment verification.
+
+### Remaining before production
+
+1. **Production database operations:** The schema is initialized at startup, but formal versioned migrations, backups, restore procedures, and managed database deployment configuration are still needed.
+2. **Live integration verification:** Run signup, login, chat, recall, retain, and reflect against configured PostgreSQL, Hindsight, and Groq credentials. The local environment currently has no running PostgreSQL service.
+3. **Memory provider controls:** Hindsight provider memories are intentionally read-only in the UI; deletion/edit is available only for app-managed PostgreSQL memory records.
+4. **Production hardening:** Configure HTTPS, production origins, secure secrets, database TLS, monitoring, deployment settings, and broader end-to-end/accessibility testing.
+5. **UI polish:** Resolve remaining non-blocking frontend lint warnings and verify responsive behavior on real mobile/tablet devices.
+
+### Current limitations
+
+- Authentication and saved data require a running PostgreSQL database and a configured `DATABASE_URL`; account/data endpoints are unavailable without it.
+- The backend fallback response memory remains process-local and disappears when the server restarts.
+- Live Hindsight memory and Groq generation require valid service credentials. Without them, the app uses its existing fallback behavior where applicable.
+- PostgreSQL integration tests are present but were not run here because no database server is available.
+- `/api/reflect` and the external-provider flow still require verification with live service credentials.
+
+### Recommended implementation order
+
+1. Start PostgreSQL and execute the integration test suite.
+2. Verify account isolation and every authenticated API against a real database.
+3. Verify Hindsight retain/recall/reflect and Groq generation with service credentials.
+4. Add formal migrations, production deployment configuration, monitoring, backup, and restore procedures.
+5. Finish responsive/accessibility review and end-to-end tests.
+
+The project now includes the core authenticated application features, but it is **not yet production-ready** until the database, external services, and deployment operations are configured and verified.
 
 ---
 

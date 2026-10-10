@@ -1,4 +1,7 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import useAuth from "../hooks/useAuth.js";
+import { useEffect, useState } from "react";
+import { getSettings } from "../services/api.js";
 
 const navigation = [
   ["Dashboard", "/dashboard"],
@@ -8,6 +11,26 @@ const navigation = [
 ];
 
 export default function AppLayout() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [logoutError, setLogoutError] = useState("");
+
+  useEffect(() => {
+    getSettings()
+      .then(({ settings }) => { document.documentElement.dataset.theme = settings.theme; })
+      .catch((error) => setLogoutError(error.message));
+  }, []);
+
+  async function handleLogout() {
+    setLogoutError("");
+    try {
+      await logout();
+      navigate("/", { replace: true });
+    } catch (error) {
+      setLogoutError(error.message);
+    }
+  }
+
   return (
     <div className="workspace-layout">
       <header className="workspace-header">
@@ -29,9 +52,12 @@ export default function AppLayout() {
           <NavLink className="workspace-chat-link" to="/chat">
             Open Chat
           </NavLink>
+          <span className="workspace-user">{user?.display_name}</span>
+          <button className="workspace-logout" onClick={handleLogout}>Log out</button>
         </nav>
       </header>
       <main className="workspace-content">
+        {logoutError && <p className="form-error" role="alert">{logoutError}</p>}
         <Outlet />
       </main>
     </div>
