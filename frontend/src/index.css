@@ -209,3 +209,32 @@ body{background-color:var(--bg-primary);color:var(--text-primary);font-family:va
 .toast-memory{border-left:3px solid var(--accent-cyan);}
 .toast-icon{font-size:16px;}
 .toast-msg{color:var(--text-secondary);}
+
+/* Routed workspace and public landing page */
+.landing-page,.workspace-layout{min-height:100vh;position:relative;isolation:isolate;background:var(--bg-primary);color:var(--text-primary);}
+.landing-glow{position:absolute;inset:0 0 auto;height:560px;background:radial-gradient(ellipse at 50% 0,rgba(99,102,241,.22),transparent 68%);pointer-events:none;z-index:-1;}
+.landing-header,.workspace-header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px clamp(18px,5vw,72px);border-bottom:1px solid var(--border-color);background:rgba(9,13,22,.78);backdrop-filter:blur(16px);}
+.landing-header nav,.workspace-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.landing-header nav a,.workspace-nav-link,.workspace-chat-link{color:var(--text-secondary);text-decoration:none;font-size:13px;font-weight:600;padding:9px 12px;border-radius:8px;transition:background .2s ease,color .2s ease;}
+.landing-header nav a:hover,.workspace-nav-link:hover,.workspace-nav-link.active{color:var(--text-primary);background:rgba(99,102,241,.16);}
+.workspace-brand{display:inline-flex;align-items:center;gap:9px;color:var(--text-primary);font-weight:800;text-decoration:none;white-space:nowrap;}
+.workspace-brand span{font-size:20px;}
+.landing-hero{width:min(900px,calc(100% - 40px));margin:clamp(70px,14vh,150px) auto 0;text-align:center;}
+.page-eyebrow{color:var(--accent-cyan);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;}
+.landing-hero h1{font-size:clamp(38px,7vw,72px);line-height:1.08;letter-spacing:-.055em;max-width:850px;margin:0 auto;background:linear-gradient(135deg,#fff 28%,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.page-description{max-width:660px;color:var(--text-secondary);font-size:16px;line-height:1.75;margin:18px auto 0;}
+.page-actions{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:28px;}
+.page-primary-link,.page-secondary-link{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 16px;border-radius:9px;text-decoration:none;font-size:13px;font-weight:700;}
+.page-primary-link{background:linear-gradient(135deg,var(--accent-indigo),#4f46e5);color:#fff;box-shadow:0 10px 30px rgba(79,70,229,.25);}
+.page-secondary-link{border:1px solid var(--border-color);background:rgba(255,255,255,.04);color:var(--text-primary);}
+.workspace-chat-link{background:linear-gradient(135deg,var(--accent-indigo),#4f46e5);color:#fff!important;}
+.workspace-content{width:min(1100px,calc(100% - 36px));margin:clamp(30px,7vh,72px) auto;}
+.page-card{padding:clamp(22px,5vw,48px);border:1px solid var(--border-color);border-radius:18px;background:linear-gradient(145deg,rgba(15,23,42,.92),rgba(15,23,42,.68));box-shadow:0 22px 70px rgba(0,0,0,.24);}
+.page-card h1{font-size:clamp(30px,5vw,46px);letter-spacing:-.04em;}
+.page-card>.page-description{margin:12px 0 0;max-width:720px;}
+.page-card .page-actions{justify-content:flex-start;}
+.dashboard-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:26px;}
+.dashboard-links a{display:flex;flex-direction:column;gap:8px;padding:18px;border:1px solid var(--border-color);border-radius:12px;background:rgba(30,41,59,.55);text-decoration:none;color:var(--text-primary);}
+.dashboard-links a:hover{border-color:var(--border-glow);background:rgba(99,102,241,.1);}
+.dashboard-links span{color:var(--text-secondary);font-size:13px;line-height:1.6;}
+@media(max-width:700px){.landing-header,.workspace-header{align-items:flex-start;flex-direction:column;padding:14px 18px}.landing-header nav,.workspace-nav{width:100%;gap:4px}.workspace-nav-link,.workspace-chat-link,.landing-header nav a{padding:8px;font-size:12px}.landing-hero{margin-top:72px}.page-description{font-size:14px}.dashboard-links{grid-template-columns:1fr}}

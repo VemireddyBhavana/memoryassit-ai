@@ -1,5 +1,11 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import React from "react";
+import {
+  createReflection,
+  resetMemorySession,
+  sendChat,
+} from "../services/api.js";
+import useBackendOverview from "../hooks/useBackendOverview.js";
 
 // ── Simple Markdown Renderer ─────────────────────────────────────────────────
 function MarkdownText({ text }) {
@@ -98,19 +104,22 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("live");
   const [liveMemories, setLiveMemories] = useState([]);
-  const [allBankMemories, setAllBankMemories] = useState([]);
+  const {
+    health: systemHealth,
+    memories: allBankMemories,
+    loading: isRefreshing,
+    refresh: refreshBackendOverview,
+  } = useBackendOverview();
   const [bankSearch, setBankSearch] = useState("");
   const [reflection, setReflection] = useState(null);
   const [isReflecting, setIsReflecting] = useState(false);
   const [telemetry, setTelemetry] = useState({ recallLatencyMs: null, totalLatencyMs: null, bankId: "MemoryAssist-AI", totalBankMemories: 0, totalRetained: 0, avgLatencyMs: null });
-  const [systemHealth, setSystemHealth] = useState(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [syncStatus, setSyncStatus] = useState("");
   const [severity, setSeverity] = useState("P1");
   const [speakingIndex, setSpeakingIndex] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [toasts, setToasts] = useState([]);
-  const [incidentStartTime, setIncidentStartTime] = useState(null);
+  const [incidentStartTime, setIncidentStartTime] = useState(() => Date.now());
   const [incidentElapsed, setIncidentElapsed] = useState("00:00");
   const [retainedMsgIdx, setRetainedMsgIdx] = useState(null);
   const [latencyHistory, setLatencyHistory] = useState([]);
@@ -125,13 +134,22 @@ function App() {
 
   const dismissToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
-  useEffect(() => { fetchHealthAndMemories(); }, []);
+  const fetchHealthAndMemories = useCallback(async ({ showLoading = true } = {}) => {
+    try {
+      const result = await refreshBackendOverview({ showLoading });
+      if (result.memories) {
+        setTelemetry(prev => ({ ...prev, totalBankMemories: result.memories.length }));
+      }
+      setSyncStatus(result.ok ? "✓ Synced!" : "⚠️ Error");
+      setTimeout(() => setSyncStatus(""), result.ok ? 2000 : 2500);
+    } catch {
+      setSyncStatus("⚠️ Error");
+      setTimeout(() => setSyncStatus(""), 2500);
+    }
+  }, [refreshBackendOverview]);
 
-  useEffect(() => {
-    if (severity === "P1") { if (!incidentStartTime) setIncidentStartTime(Date.now()); }
-    else { setIncidentStartTime(null); setIncidentElapsed("00:00"); }
-  }, [severity]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
+  useEffect(() => { fetchHealthAndMemories({ showLoading: false }); }, [fetchHealthAndMemories]);
 
   useEffect(() => {
     if (!incidentStartTime) return;
@@ -150,24 +168,6 @@ function App() {
     pushToast(`Switched to ${target.name}`, "success", "🏢");
   };
 
-  const fetchHealthAndMemories = async () => {
-    setIsRefreshing(true);
-    try {
-      const [healthRes, memRes] = await Promise.all([
-        fetch("http://localhost:5000/api/health").catch(() => null),
-        fetch("http://localhost:5000/api/memories").catch(() => null),
-      ]);
-      if (healthRes?.ok) setSystemHealth(await healthRes.json());
-      if (memRes?.ok) {
-        const memData = await memRes.json();
-        setAllBankMemories(memData.items || []);
-        setTelemetry(prev => ({ ...prev, totalBankMemories: memData.items?.length || 0 }));
-      }
-      setSyncStatus("✓ Synced!"); setTimeout(() => setSyncStatus(""), 2000);
-    } catch { setSyncStatus("⚠️ Error"); setTimeout(() => setSyncStatus(""), 2500); }
-    finally { setIsRefreshing(false); }
-  };
-
   const handleSend = async (messageText = input) => {
     const textToSend = messageText.trim();
     if (!textToSend || loading) return;
@@ -176,11 +176,7 @@ function App() {
     setMessages(prev => [...prev, { role: "user", content: textToSend }]);
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: textToSend, customerId: selectedCustomerId }),
-      });
-      const data = await res.json();
+      const data = await sendChat(textToSend, selectedCustomerId);
       const newAiIdx = newUserIdx + 1;
       setMessages(prev => [...prev, { role: "assistant", content: data.reply, memoriesUsed: data.recalledMemories || [], retained: true }]);
       if (data.recalledMemories?.length > 0) {
@@ -209,11 +205,7 @@ function App() {
     setIsReflecting(true); setActiveTab("reflect");
     pushToast("Running Hindsight reflect()…", "info", "🔮");
     try {
-      const res = await fetch("http://localhost:5000/api/reflect", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: `Synthesize an executive incident post-mortem and long-term architectural recommendations for ${currentCustomer.name} on cluster ${currentCustomer.cluster}.` }),
-      });
-      const data = await res.json();
+      const data = await createReflection(`Synthesize an executive incident post-mortem and long-term architectural recommendations for ${currentCustomer.name} on cluster ${currentCustomer.cluster}.`);
       setReflection(data.reflection);
       pushToast("Executive post-mortem ready!", "success", "📋");
     } catch { setReflection("Unable to generate reflection. Please verify server connection."); pushToast("Reflection failed", "error", "❌"); }
@@ -239,7 +231,7 @@ function App() {
   const handleResetSession = async () => {
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     setSpeakingIndex(null);
-    try { await fetch("http://localhost:5000/api/reset", { method: "POST" }); } catch {}
+    try { await resetMemorySession(); } catch {}
     setMessages([{ role: "assistant", content: `Session reset! Clean slate initialized for **${currentCustomer.name}**. Ready for a fresh demo test.`, memoriesUsed: [], retained: false }]);
     setLiveMemories([]); setReflection(null); setLatencyHistory([]);
     pushToast("Session cleared & reset", "info", "🧹");
@@ -323,7 +315,7 @@ function App() {
                 <span>Severity:</span>
                 <div className="severity-pill-group">
                   {[["P1","🔴"],["P2","🟡"],["P3","🟢"]].map(([p,e])=>(
-                    <button key={p} className={`severity-pill ${severity===p?`active ${p.toLowerCase()}`:""}`} onClick={()=>setSeverity(p)}>{e} {p}</button>
+                    <button key={p} className={`severity-pill ${severity===p?`active ${p.toLowerCase()}`:""}`} onClick={()=>{setSeverity(p);if(p==="P1"&&severity!=="P1")setIncidentStartTime(Date.now());if(p!=="P1"){setIncidentStartTime(null);setIncidentElapsed("00:00");}}}>{e} {p}</button>
                   ))}
                 </div>
               </div>
