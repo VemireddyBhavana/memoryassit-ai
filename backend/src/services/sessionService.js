@@ -20,9 +20,10 @@ async function issueSession(userId, res) {
     [tokenHash, userId, expiresAt],
   );
   const secure = COOKIE_SECURE ? "; Secure" : "";
+  const sameSite = COOKIE_SECURE ? "None" : "Lax";
   res.setHeader(
     "Set-Cookie",
-    `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS * 86400}${secure}`,
+    `${COOKIE_NAME}=${token}; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=${SESSION_DAYS * 86400}${secure}`,
   );
 }
 
@@ -32,9 +33,10 @@ async function revokeSession(tokenHash) {
 
 function clearSessionCookie(res) {
   const secure = COOKIE_SECURE ? "; Secure" : "";
+  const sameSite = COOKIE_SECURE ? "None" : "Lax";
   res.setHeader(
     "Set-Cookie",
-    `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`,
+    `${COOKIE_NAME}=; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=0${secure}`,
   );
 }
 
